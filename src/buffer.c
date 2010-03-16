@@ -69,7 +69,7 @@ int Buffer_ensure_remaining(Buffer *buffer, int len)
 }
 
 
-int Buffer_send(Buffer *buffer, int fd)
+size_t Buffer_send(Buffer *buffer, int fd)
 {
 	printf("Buffer_send fd: %d, position: %d, limit: %d, remaining: %d\n", fd, buffer->position, buffer->limit, Buffer_remaining(buffer));
 	size_t bytes_written = write(fd, buffer->data + buffer->position, Buffer_remaining(buffer));
@@ -80,6 +80,7 @@ int Buffer_send(Buffer *buffer, int fd)
 	else {
 		buffer->position += bytes_written;
 	}
+	return bytes_written;
 }
 
 int Buffer_recv(Buffer *buffer, int fd, size_t len)

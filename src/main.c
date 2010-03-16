@@ -108,8 +108,9 @@ int main(void) {
 
 	//Connection_loop(connection, 0, 0, 0);
 
-	/*
 	event_dispatch();
+
+	/*
 
 	printf("write buff:\n");
 	Buffer_dump(Connection_write_buffer(connection), 64);
@@ -118,8 +119,9 @@ int main(void) {
 	printf("cmd buff:\n");
 	Buffer_dump(Connection_command_buffer(connection), 64);
 
-	printf("done!");
 	*/
+
+	printf("normal main done!");
 
 	return 0;
 }

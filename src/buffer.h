@@ -14,7 +14,7 @@ int Buffer_remaining(Buffer *buffer);
 int Buffer_printf(Buffer *buffer, const char *format, ...);
 int Buffer_vprintf(Buffer *buffer, const char *format, va_list args);
 int Buffer_recv(Buffer *buffer, int fd, size_t len);
-int Buffer_send(Buffer *buffer, int fd);
+size_t Buffer_send(Buffer *buffer, int fd);
 
 #endif
 
