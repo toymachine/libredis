@@ -11,6 +11,14 @@
 #include "buffer.h"
 #include "connection.h"
 
+typedef enum _ConnectionState
+{
+    CS_INIT = 0,
+    CS_CONNECTING = 1,
+    CS_EXECUTING = 2
+} ConnectionState;
+
+
 struct _Connection
 {
 	const char *addr;
@@ -137,12 +145,12 @@ void Connection_event_callback(int fd, short flags, Connection *connection)
 }
 
 
-int Connection_command_bulk(Connection *connection,
-                             const char *command, int command_len,
-                             const char *key, int key_len,
-                             const char *value, int value_len)
+int Connection_write_command(Connection *connection, const char *format, ...)
 {
-	Buffer_printf(connection->write_buffer, "%s %s %d\r\n%s\r\n", command, key, value_len, value);
+	va_list args;
+	va_start(args, format);
+	Buffer_vprintf(connection->write_buffer, format, args);
+	va_end(args);
 	Buffer_printf(connection->command_buffer, "%c", 1);
 	return 0;
 }

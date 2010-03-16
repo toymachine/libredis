@@ -12,7 +12,7 @@
 void *Alloc_alloc(size_t size) { return malloc(size); }
 void Alloc_free(void *address) { free(address); }
 
-int main(void)
+int main2(void)
 {
 	printf("bla\n");
 
@@ -86,7 +86,7 @@ int main(void)
     return 0;
 }
 
-int main2(void) {
+int main(void) {
 	event_init();
 
 	Alloc alloc = { Alloc_alloc, Alloc_free };
@@ -94,8 +94,8 @@ int main2(void) {
 	//Redis *redis = Redis_new(&alloc);
 
 	Connection *connection = Connection_new(&alloc, "127.0.0.1", 6379);
-	Connection_command_bulk(connection, "SET", 3, "blaat", 5, "aap", 3);
 
+	Connection_write_command(connection, "%s %s %d\r\n%s\r\n", "SET", "blaat", 3, "aap");
 	//Redis_add_connection(redis, connection);
 	Buffer_flip(Connection_write_buffer(connection));
 	Buffer_flip(Connection_command_buffer(connection));
@@ -108,6 +108,7 @@ int main2(void) {
 
 	//Connection_loop(connection, 0, 0, 0);
 
+	/*
 	event_dispatch();
 
 	printf("write buff:\n");
@@ -118,6 +119,7 @@ int main2(void) {
 	Buffer_dump(Connection_command_buffer(connection), 64);
 
 	printf("done!");
+	*/
 
 	return 0;
 }

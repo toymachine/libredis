@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <stdarg.h>
 #include <errno.h>
 
 #include "common.h"
@@ -106,32 +105,29 @@ int Buffer_flip(Buffer *buffer)
 {
 	buffer->limit = buffer->position;
 	buffer->position = 0;
+	return 0;
 }
 
-/*
-int Buffer_write_string(Buffer *buffer, const char *s, int len)
+int Buffer_vprintf(Buffer *buffer, const char *format, va_list args)
 {
-	Buffer_ensure_remaining(buffer, len);
-	memcpy(buffer->data + buffer->position, s, len);
-	buffer->position += len;
-}
-*/
-
-int Buffer_printf(Buffer *buffer, const char *format, ...)
-{
-	va_list args;
 	int remaining = buffer->limit - buffer->position;
-	va_start(args, format);
 	int written = vsnprintf(buffer->data + buffer->position, remaining, format, args);
-	va_end(args);
 	if(written > remaining) {
 		Buffer_ensure_remaining(buffer, written);
 		remaining = buffer->limit - buffer->position;
-		va_start(args, format);
 		written = vsnprintf(buffer->data + buffer->position, remaining, format, args);
-		va_end(args);
 		//TODO check written again
 		printf("assert!");
 	}
 	buffer->position += written;
 }
+
+int Buffer_printf(Buffer *buffer, const char *format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	int res = Buffer_vprintf(buffer, format, args);
+	va_end(args);
+	return res;
+}
+
