@@ -18,11 +18,11 @@ struct _Buffer
 	int mark;
 };
 
-Buffer *Buffer_new(Alloc *alloc, size_t size)
+Buffer *Buffer_new(size_t size)
 {
-	Buffer *buffer = (Buffer *)alloc->alloc(sizeof(Buffer));
+	Buffer *buffer = REDIS_ALLOC_T(Buffer);
 	buffer->buff_size = size;
-	buffer->buff = alloc->alloc(size);
+	buffer->buff = REDIS_ALLOC(size);
 	buffer->data = buffer->buff;
 	buffer->position = 0;
 	buffer->capacity = size;
@@ -60,6 +60,23 @@ int Buffer_remaining(Buffer *buffer)
     return (buffer->limit - buffer->position);
 }
 
+int Buffer_position(Buffer *buffer)
+{
+	return buffer->position;
+}
+
+int Buffer_set_position(Buffer *buffer, int position)
+{
+	buffer->position = position;
+	return 0;
+}
+
+int Buffer_set_limit(Buffer *buffer, int limit)
+{
+	buffer->limit = limit;
+	return 0;
+}
+
 int Buffer_ensure_remaining(Buffer *buffer, int len)
 {
 	if(Buffer_remaining(buffer) < len) {
@@ -83,7 +100,7 @@ size_t Buffer_send(Buffer *buffer, int fd)
 	return bytes_written;
 }
 
-int Buffer_recv(Buffer *buffer, int fd, size_t len)
+size_t Buffer_recv(Buffer *buffer, int fd, size_t len)
 {
 	printf("Buffer_recv fd: %d, position: %d, limit: %d, remaining: %d\n", fd, buffer->position, buffer->limit, Buffer_remaining(buffer));
 	if(len == -1) {
@@ -100,6 +117,7 @@ int Buffer_recv(Buffer *buffer, int fd, size_t len)
 	else {
 		buffer->position += bytes_read;
 	}
+	return bytes_read;
 }
 
 int Buffer_flip(Buffer *buffer)

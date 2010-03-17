@@ -3,22 +3,17 @@
 #include <stdio.h>
 #include <event.h>
 
-#include "common.h"
-#include "buffer.h"
-#include "parser.h"
-#include "connection.h"
 #include "redis.h"
-
-void *Alloc_alloc(size_t size) { return malloc(size); }
-void Alloc_free(void *address) { free(address); }
+#include "batch.h"
+#include "parser.h"
 
 int main2(void)
 {
 	printf("bla\n");
 
-	Alloc alloc = { Alloc_alloc, Alloc_free };
+	//Alloc alloc = { Alloc_alloc, Alloc_free };
 
-    ReplyParser *rp = ReplyParser_new(&alloc);
+    ReplyParser *rp = ReplyParser_new();
 
 
     //char *buffer = "+blaat aap\r\n";
@@ -89,37 +84,15 @@ int main2(void)
 int main(void) {
 	event_init();
 
-	Alloc alloc = { Alloc_alloc, Alloc_free };
+	Connection *connection = Connection_new("127.0.0.1", 6379);
 
-	//Redis *redis = Redis_new(&alloc);
+	Batch *batch = Batch_new();
+	Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "blaat", 3, "aap");
+	Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "piet", 7, "jaapaap");
 
-	Connection *connection = Connection_new(&alloc, "127.0.0.1", 6379);
-
-	Connection_write_command(connection, "%s %s %d\r\n%s\r\n", "SET", "blaat", 3, "aap");
-	//Redis_add_connection(redis, connection);
-	Buffer_flip(Connection_write_buffer(connection));
-	Buffer_flip(Connection_command_buffer(connection));
-
-	printf("write buff:\n");
-	Buffer_dump(Connection_write_buffer(connection), 64);
-
-	printf("cmd buff:\n");
-	Buffer_dump(Connection_command_buffer(connection), 64);
-
-	//Connection_loop(connection, 0, 0, 0);
+	Batch_execute(batch, connection);
 
 	event_dispatch();
-
-	/*
-
-	printf("write buff:\n");
-	Buffer_dump(Connection_write_buffer(connection), 64);
-	printf("read buff:\n");
-	Buffer_dump(Connection_read_buffer(connection), 64);
-	printf("cmd buff:\n");
-	Buffer_dump(Connection_command_buffer(connection), 64);
-
-	*/
 
 	printf("normal main done!");
 

@@ -50,10 +50,9 @@ int ReplyParser_init(ReplyParser *rp)
     return 0;   
 }
 
-ReplyParser *ReplyParser_new(Alloc *alloc)
+ReplyParser *ReplyParser_new()
 {
-	assert(alloc != NULL);
-	ReplyParser *rp = (ReplyParser *)alloc->alloc(sizeof(ReplyParser));
+	ReplyParser *rp = REDIS_ALLOC_T(ReplyParser);
 	ReplyParser_init(rp);
 	return rp;
 }

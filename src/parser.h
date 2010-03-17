@@ -17,6 +17,6 @@ size_t ReplyParser_length(ReplyParser *rp);
 size_t ReplyParser_offset(ReplyParser *rp);
 int ReplyParser_multibulk_count(ReplyParser *rp);
 int ReplyParser_init(ReplyParser *rp);
-ReplyParser *ReplyParser_new(Alloc *alloc);
+ReplyParser *ReplyParser_new();
 ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len);
 

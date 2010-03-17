@@ -11,6 +11,7 @@
 #include "common.h"
 #include "buffer.h"
 #include "connection.h"
+#include "connection_private.h"
 
 typedef enum _ConnectionState
 {
@@ -28,25 +29,9 @@ struct _Connection
 	ConnectionState state;
 	struct event event_read;
 	struct event event_write;
-	Buffer *read_buffer;
-	Buffer *write_buffer;
-	Buffer *command_buffer;
+	struct list_head write_queue; //commands queued for writing
+	struct list_head read_queue; //commands queued for reading
 };
-
-Buffer *Connection_command_buffer(Connection *connection)
-{
-	return connection->command_buffer;
-}
-
-Buffer *Connection_read_buffer(Connection *connection)
-{
-	return connection->read_buffer;
-}
-
-Buffer *Connection_write_buffer(Connection *connection)
-{
-	return connection->write_buffer;
-}
 
 void Connection_event_add(Connection *connection, struct event *event, long int tv_sec, long int tv_usec)
 {
@@ -68,23 +53,23 @@ int Connection_connect(Connection *connection)
 	return connect(connection->sockfd, (struct sockaddr *) &sa, sizeof(struct sockaddr));
 }
 
+int Connection_buffer_next_command(Connection *connection)
+{
+	if(!list_empty(&connection->write_queue)) {
+		struct list_head *pos = list_last(&connection->write_queue);
+		Command *cmd = list_entry(pos, Command, list);
+		Buffer_set_position(cmd->buffer, cmd->offset);
+		Buffer_set_limit(cmd->buffer, cmd->offset + cmd->len);
+		return 1;
+	}
+	else {
+		return 0;
+	}
+}
+
 void Connection_write_data(Connection *connection)
 {
 	printf("connection write_data fd: %d\n", connection->sockfd);
-
-	if(CS_CONNECTING == connection->state) {
-		//now check for error to see if we are really connected
-		int error;
-		socklen_t len = sizeof(int);
-		getsockopt(connection->sockfd, SOL_SOCKET, SO_ERROR, &error, &len);
-		if(error != 0) {
-			printf("connect error: %d\n", error);
-			abort();
-		}
-		else {
-			connection->state = CS_CONNECTED;
-		}
-	}
 
 	if(CS_CLOSED == connection->state) {
 		if(-1 == Connection_connect(connection)) {
@@ -108,41 +93,71 @@ void Connection_write_data(Connection *connection)
 		}
 	}
 
+	if(CS_CONNECTING == connection->state) {
+		//now check for error to see if we are really connected
+		int error;
+		socklen_t len = sizeof(int);
+		getsockopt(connection->sockfd, SOL_SOCKET, SO_ERROR, &error, &len);
+		if(error != 0) {
+			printf("connect error: %d\n", error);
+			abort();
+		}
+		else {
+			connection->state = CS_CONNECTED;
+		}
+	}
+
 	if(CS_CONNECTED == connection->state) {
-		while(Buffer_remaining(connection->write_buffer)) {
-			//still something to write
-			size_t res = Buffer_send(connection->write_buffer, connection->sockfd);
-			printf("bfr send res: %d\n", res);
-			if(res == -1) {
-				if(errno == EAGAIN) {
-					Connection_event_add(connection, &connection->event_write, 0, 400000);
-					return;
-				}
-				else {
-					printf("send error, errno: %d\n", errno);
-					abort();
+
+		while(!list_empty(&connection->write_queue)) {
+			struct list_head *pos = list_last(&connection->write_queue);
+			Command *cmd = list_entry(pos, Command, list);
+			printf("offset= %d len= %d\n", cmd->offset, cmd->len);
+			while(Buffer_remaining(cmd->buffer)) {
+				//still something to write
+				size_t res = Buffer_send(cmd->buffer, connection->sockfd);
+				printf("bfr send res: %d\n", res);
+				if(res == -1) {
+					if(errno == EAGAIN) {
+						Connection_event_add(connection, &connection->event_write, 0, 400000);
+						return;
+					}
+					else {
+						printf("send error, errno: %d\n", errno);
+						abort();
+					}
 				}
 			}
+			//command written
+			pos = list_pop(&connection->write_queue);
+			list_add(pos, &connection->read_queue);
+			Connection_event_add(connection, &connection->event_read, 0, 400000);
+			Connection_buffer_next_command(connection);
 		}
 	}
 }
 
-/*
+int Connection_add_commands(Connection *connection, struct list_head *commands)
+{
+	list_splice_init(commands, &connection->write_queue);
+	if(Connection_buffer_next_command(connection)) {
+		Connection_write_data(connection);
+	}
+	return 0;
+}
+
 void Connection_read_data(Connection *connection)
 {
 	printf("connection read fd: %d\n", connection->sockfd);
 
-	if(Buffer_remaining(connection->command_buffer) && readable) {
-		Buffer_recv(connection->read_buffer, connection->sockfd, DEFAULT_READ_BUFF_SIZE);
-	}
-
-	//now
-
-	if(Buffer_remaining(connection->command_buffer)) {
-		Connection_event_add(connection, &connection->event_read, 0, 400000);
+	while(!list_empty(&connection->read_queue)) {
+		struct list_head *pos = list_last(&connection->read_queue);
+		Command *cmd = list_entry(pos, Command, list);
+		size_t res = Buffer_recv(cmd->read_buffer, connection->sockfd, DEFAULT_READ_BUFF_SIZE);
+		Buffer_dump(cmd->read_buffer, 64);
+		break;
 	}
 }
-*/
 
 void Connection_handle_event(int fd, short flags, void *data)
 {
@@ -151,48 +166,44 @@ void Connection_handle_event(int fd, short flags, void *data)
 	printf("con event, fd: %d, state: %d, readable: %d, writeable: %d, timeout: %d\n", connection->sockfd,
 			connection->state, (flags & EV_READ) ? 1 : 0, (flags & EV_WRITE) ? 1 : 0, (flags & EV_TIMEOUT) ? 1 : 0 );
 
-	if(flags & EV_TIMEOUT) {
-		abort();
-	}
-
 	if(flags & EV_WRITE) {
+		if(flags & EV_TIMEOUT) {
+			abort();
+		}
 		Connection_write_data(connection);
 	}
+
+	if(flags & EV_READ) {
+		if(flags & EV_TIMEOUT) {
+			abort();
+		}
+		Connection_read_data(connection);
+	}
+
 }
 
 
-int Connection_write_command(Connection *connection, const char *format, ...)
-{
-	va_list args;
-	va_start(args, format);
-	Buffer_vprintf(connection->write_buffer, format, args);
-	va_end(args);
-	Buffer_printf(connection->command_buffer, "%c", 1);
-	Connection_write_data(connection);
-	return 0;
-}
 
-Connection *Connection_new(Alloc *alloc, const char *addr, int port)
+Connection *Connection_new(const char *addr, int port)
 {
-	Connection *connection = (Connection *)alloc->alloc(sizeof(Connection));
+	Connection *connection = REDIS_ALLOC_T(Connection);
 	connection->state = CS_CLOSED;
 	connection->addr = addr;
 	connection->port = port;
 	connection->sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	connection->read_buffer = Buffer_new(alloc, DEFAULT_READ_BUFF_SIZE);
-	connection->write_buffer = Buffer_new(alloc, DEFAULT_WRITE_BUFF_SIZE);
-	connection->command_buffer = Buffer_new(alloc, DEFAULT_COMMAND_BUFF_SIZE);
+	INIT_LIST_HEAD(&connection->write_queue);
+	INIT_LIST_HEAD(&connection->read_queue);
 	event_set(&connection->event_read, connection->sockfd, EV_READ, &Connection_handle_event, (void *)connection);
 	event_set(&connection->event_write, connection->sockfd, EV_WRITE, &Connection_handle_event, (void *)connection);
-	int flags;
 	//set socket in non-blocking mode
+	int flags;
 	if ((flags = fcntl(connection->sockfd, F_GETFL, 0)) < 0)
 	{
-	/* Handle error */
+		abort();
 	}
 	if (fcntl(connection->sockfd, F_SETFL, flags | O_NONBLOCK) < 0)
 	{
-	/* Handle error */
+		abort();
 	}
 	return connection;
 }
