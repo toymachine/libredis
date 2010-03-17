@@ -1,7 +1,7 @@
 #ifndef REPLY_H_
 #define REPLY_H_
 
-#include "list.h"
+#include "common.h"
 
 typedef enum _ReplyType
 {
@@ -13,19 +13,7 @@ typedef enum _ReplyType
     RT_MULTIBULK = 6,
 } ReplyType;
 
-typedef struct _Reply
-{
-	struct list_head list;
-
-	ReplyType type;
-	Buffer *buffer;
-	size_t offset;
-	size_t len;
-
-	struct list_head children;
-
-} Reply;
-
-Reply *Reply_new();
+Reply *Reply_new(ReplyType type, Buffer *buffer, size_t offset, size_t len);
+ReplyType Reply_type(Reply *reply);
 
 #endif /* REPLY_H_ */

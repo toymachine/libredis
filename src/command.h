@@ -1,30 +1,18 @@
 #ifndef __COMMAND_H
 #define __COMMAND_H
 
-#include <event.h>
-
-#include "connection.h"
-#include "buffer.h"
+#include "common.h"
 #include "list.h"
-#include "batch.h"
-
-typedef struct _Command
-{
-	struct list_head list;
-
-	Batch *batch;
-	Buffer *write_buffer;
-	Buffer *read_buffer;
-	size_t offset;
-	size_t len;
-
-	Reply *reply;
-
-} Command;
 
 Command *Command_new();
+Command *Command_list_last(struct list_head *head);
+Command *Command_list_pop(struct list_head *head);
 
+Buffer *Command_read_buffer(Command *cmd);
+Buffer *Command_write_buffer(Command *cmd);
+int Command_flip_buffer(Command *cmd);
+
+int Command_reply(Command *cmd, Reply *reply);
 int Connection_add_commands(Connection *connection, struct list_head *commands);
-int Batch_add_reply(Batch *batch, Command *cmd);
 
 #endif

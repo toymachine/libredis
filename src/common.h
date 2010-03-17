@@ -14,14 +14,18 @@
 #define LF '\n'
 #define CRLF '\r\n'
 
+typedef char Byte;
+
 typedef struct _Redis Redis;
+typedef struct _Batch Batch;
+typedef struct _Command Command;
+typedef struct _Connection Connection;
+typedef struct _Reply Reply;
 
 Redis *Redis_get_instance();
 void *_Redis_alloc(Redis *redis, size_t size);
 
 #define Redis_alloc(SIZE) _Redis_alloc(Redis_get_instance(), SIZE)
 #define Redis_alloc_T(T) (T *)_Redis_alloc(Redis_get_instance(), sizeof(T))
-
-typedef char Byte;
 
 #endif

@@ -97,9 +97,10 @@ int main(void) {
 
 	while(Batch_has_result(batch)) {
 		Reply *reply = Batch_next_result(batch);
-		switch(reply->type) {
+		ReplyType reply_type = Reply_type(reply);
+		switch(reply_type) {
 		default:
-			printf("unknown reply %d\n", reply->type);
+			printf("unknown reply %d\n", reply_type);
 		}
 	}
 	printf("normal main done!");

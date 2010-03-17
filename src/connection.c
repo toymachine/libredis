@@ -12,6 +12,7 @@
 #include "buffer.h"
 #include "connection.h"
 #include "command.h"
+#include "reply.h"
 #include "parser.h"
 
 typedef enum _ConnectionState
@@ -58,10 +59,8 @@ int Connection_connect(Connection *connection)
 int Connection_buffer_next_command(Connection *connection)
 {
 	if(!list_empty(&connection->write_queue)) {
-		struct list_head *pos = list_last(&connection->write_queue);
-		Command *cmd = list_entry(pos, Command, list);
-		Buffer_set_position(cmd->write_buffer, cmd->offset);
-		Buffer_set_limit(cmd->write_buffer, cmd->offset + cmd->len);
+		Command *cmd = Command_list_last(&connection->write_queue);
+		Command_flip_buffer(cmd);
 		return 1;
 	}
 	else {
@@ -112,12 +111,11 @@ void Connection_write_data(Connection *connection)
 	if(CS_CONNECTED == connection->state) {
 
 		while(!list_empty(&connection->write_queue)) {
-			struct list_head *pos = list_last(&connection->write_queue);
-			Command *cmd = list_entry(pos, Command, list);
-			printf("offset= %d len= %d\n", cmd->offset, cmd->len);
-			while(Buffer_remaining(cmd->write_buffer)) {
+			Command *cmd = Command_list_last(&connection->write_queue);
+			Buffer *buffer = Command_write_buffer(cmd);
+			while(Buffer_remaining(buffer)) {
 				//still something to write
-				size_t res = Buffer_send(cmd->write_buffer, connection->sockfd);
+				size_t res = Buffer_send(buffer, connection->sockfd);
 				printf("bfr send res: %d\n", res);
 				if(res == -1) {
 					if(errno == EAGAIN) {
@@ -131,7 +129,7 @@ void Connection_write_data(Connection *connection)
 				}
 			}
 			//command written
-			pos = list_pop(&connection->write_queue);
+			struct list_head *pos = list_pop(&connection->write_queue);
 			list_add(pos, &connection->read_queue);
 			Connection_event_add(connection, &connection->event_read, 0, 400000);
 			Connection_buffer_next_command(connection);
@@ -153,28 +151,24 @@ void Connection_read_data(Connection *connection)
 	printf("connection read fd: %d\n", connection->sockfd);
 
 	while(!list_empty(&connection->read_queue)) {
-		struct list_head *pos = list_last(&connection->read_queue);
-		Command *cmd = list_entry(pos, Command, list);
-		size_t res = Buffer_recv(cmd->read_buffer, connection->sockfd, DEFAULT_READ_BUFF_SIZE);
+		Command *cmd = Command_list_last(&connection->read_queue);
+		size_t res = Buffer_recv(Command_read_buffer(cmd), connection->sockfd, DEFAULT_READ_BUFF_SIZE);
 		if(res == -1) {
 			abort(); //TODO
 		}
-		Buffer_dump(cmd->read_buffer, 64);
+		Buffer_dump(Command_read_buffer(cmd), 64);
 		while(1) {
-			ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(cmd->read_buffer), Buffer_position(cmd->read_buffer));
+			ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(Command_read_buffer(cmd)), Buffer_position(Command_read_buffer(cmd)));
 			switch(rp_res) {
 			case RPR_DONE: {
 				goto parser_done;
 			}
 			case RPR_OK_LINE: {
-				cmd->reply = Reply_new();
-				cmd->reply->type = RT_OK;
-				cmd->reply->buffer = cmd->read_buffer;
-				cmd->reply->offset = ReplyParser_offset(connection->parser);
-				cmd->reply->len = ReplyParser_length(connection->parser);
-				pos = list_pop(&connection->read_queue);
-				cmd = list_entry(pos, Command, list);
-				Batch_add_reply(cmd->batch, cmd);
+				Reply *reply = Reply_new(RT_OK, Command_read_buffer(cmd),
+									ReplyParser_offset(connection->parser), ReplyParser_length(connection->parser));
+				Command_reply(cmd, reply);
+				Command_list_pop(&connection->read_queue);
+				//Batch_add_reply(cmd->batch, cmd);
 				break;
 			}
 			default:
