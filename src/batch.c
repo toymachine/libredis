@@ -1,7 +1,7 @@
 #include "common.h"
 #include "batch.h"
 #include "list.h"
-#include "connection_private.h"
+#include "command.h"
 #include <stdio.h>
 
 struct _Batch
@@ -20,6 +20,19 @@ Batch *Batch_new()
 	return batch;
 }
 
+Reply *Reply_new()
+{
+	Reply *reply = REDIS_ALLOC_T(Reply);
+	INIT_LIST_HEAD(&reply->children);
+	return reply;
+}
+
+Command *Command_new()
+{
+	Command *command = REDIS_ALLOC_T(Command);
+	return command;
+}
+
 int Batch_write_command(Batch *batch, const char *format, ...)
 {
 	va_list args;
@@ -29,9 +42,9 @@ int Batch_write_command(Batch *batch, const char *format, ...)
 	size_t len = Buffer_position(batch->write_buffer) - offset;
 	va_end(args);
 
-	Command *cmd = REDIS_ALLOC_T(Command);
+	Command *cmd = Command_new();
 	cmd->batch = batch;
-	cmd->buffer = batch->write_buffer;
+	cmd->write_buffer = batch->write_buffer;
 	cmd->read_buffer = batch->read_buffer;
 	cmd->offset = offset;
 	cmd->len = len;

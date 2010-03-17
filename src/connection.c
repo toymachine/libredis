@@ -11,7 +11,8 @@
 #include "common.h"
 #include "buffer.h"
 #include "connection.h"
-#include "connection_private.h"
+#include "command.h"
+#include "parser.h"
 
 typedef enum _ConnectionState
 {
@@ -31,6 +32,7 @@ struct _Connection
 	struct event event_write;
 	struct list_head write_queue; //commands queued for writing
 	struct list_head read_queue; //commands queued for reading
+	ReplyParser *parser;
 };
 
 void Connection_event_add(Connection *connection, struct event *event, long int tv_sec, long int tv_usec)
@@ -58,8 +60,8 @@ int Connection_buffer_next_command(Connection *connection)
 	if(!list_empty(&connection->write_queue)) {
 		struct list_head *pos = list_last(&connection->write_queue);
 		Command *cmd = list_entry(pos, Command, list);
-		Buffer_set_position(cmd->buffer, cmd->offset);
-		Buffer_set_limit(cmd->buffer, cmd->offset + cmd->len);
+		Buffer_set_position(cmd->write_buffer, cmd->offset);
+		Buffer_set_limit(cmd->write_buffer, cmd->offset + cmd->len);
 		return 1;
 	}
 	else {
@@ -113,9 +115,9 @@ void Connection_write_data(Connection *connection)
 			struct list_head *pos = list_last(&connection->write_queue);
 			Command *cmd = list_entry(pos, Command, list);
 			printf("offset= %d len= %d\n", cmd->offset, cmd->len);
-			while(Buffer_remaining(cmd->buffer)) {
+			while(Buffer_remaining(cmd->write_buffer)) {
 				//still something to write
-				size_t res = Buffer_send(cmd->buffer, connection->sockfd);
+				size_t res = Buffer_send(cmd->write_buffer, connection->sockfd);
 				printf("bfr send res: %d\n", res);
 				if(res == -1) {
 					if(errno == EAGAIN) {
@@ -153,8 +155,29 @@ void Connection_read_data(Connection *connection)
 	while(!list_empty(&connection->read_queue)) {
 		struct list_head *pos = list_last(&connection->read_queue);
 		Command *cmd = list_entry(pos, Command, list);
-		size_t res = Buffer_recv(cmd->read_buffer, connection->sockfd, DEFAULT_READ_BUFF_SIZE);
-		Buffer_dump(cmd->read_buffer, 64);
+		Buffer *read_buffer = cmd->read_buffer;
+		size_t res = Buffer_recv(read_buffer, connection->sockfd, DEFAULT_READ_BUFF_SIZE);
+		if(res == -1) {
+			abort(); //TODO
+		}
+		Buffer_dump(read_buffer, 64);
+		while(1) {
+			ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(read_buffer), Buffer_position(read_buffer));
+			switch(rp_res) {
+			case RPR_OK_LINE: {
+				cmd->reply = Reply_new();
+				cmd->reply->type = RT_OK;
+				cmd->reply->buffer = read_buffer;
+				cmd->reply->offset = ReplyParser_offset(connection->parser);
+				cmd->reply->len = ReplyParser_length(connection->parser);
+				break;
+			}
+			default:
+				printf("unhandled rp result: %d\n", rp_res);
+				abort();
+			}
+		}
+
 		break;
 	}
 }
@@ -188,11 +211,17 @@ Connection *Connection_new(const char *addr, int port)
 {
 	Connection *connection = REDIS_ALLOC_T(Connection);
 	connection->state = CS_CLOSED;
+
+	//cmd queues
+	INIT_LIST_HEAD(&connection->write_queue);
+	INIT_LIST_HEAD(&connection->read_queue);
+
+	connection->parser = ReplyParser_new();
+
+	//socket stuff:
 	connection->addr = addr;
 	connection->port = port;
 	connection->sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	INIT_LIST_HEAD(&connection->write_queue);
-	INIT_LIST_HEAD(&connection->read_queue);
 	event_set(&connection->event_read, connection->sockfd, EV_READ, &Connection_handle_event, (void *)connection);
 	event_set(&connection->event_write, connection->sockfd, EV_WRITE, &Connection_handle_event, (void *)connection);
 	//set socket in non-blocking mode
@@ -205,5 +234,6 @@ Connection *Connection_new(const char *addr, int port)
 	{
 		abort();
 	}
+
 	return connection;
 }

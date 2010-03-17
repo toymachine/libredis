@@ -9,10 +9,10 @@
 
 struct _Buffer
 {
-	char *data;
-	char *buff;
+	Byte *data;
+	Byte *buff;
 	size_t buff_size;
-	int position;
+	size_t position;
 	int limit;
 	int capacity;
 	int mark;
@@ -29,6 +29,11 @@ Buffer *Buffer_new(size_t size)
 	buffer->limit = buffer->capacity;
 	buffer->mark = 0;
 	return buffer;
+}
+
+Byte *Buffer_data(Buffer *buffer)
+{
+	return buffer->data;
 }
 
 int Buffer_dump(Buffer *buffer, int limit)
@@ -53,6 +58,7 @@ int Buffer_dump(Buffer *buffer, int limit)
 		}
 		printf("\n");
 	}
+	return 0;
 }
 
 int Buffer_remaining(Buffer *buffer)
@@ -60,12 +66,12 @@ int Buffer_remaining(Buffer *buffer)
     return (buffer->limit - buffer->position);
 }
 
-int Buffer_position(Buffer *buffer)
+size_t Buffer_position(Buffer *buffer)
 {
 	return buffer->position;
 }
 
-int Buffer_set_position(Buffer *buffer, int position)
+int Buffer_set_position(Buffer *buffer, size_t position)
 {
 	buffer->position = position;
 	return 0;
@@ -139,6 +145,7 @@ int Buffer_vprintf(Buffer *buffer, const char *format, va_list args)
 		printf("assert!");
 	}
 	buffer->position += written;
+	return 0;
 }
 
 int Buffer_printf(Buffer *buffer, const char *format, ...)

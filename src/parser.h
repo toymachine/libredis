@@ -5,6 +5,7 @@ typedef enum _ReplyParserResult
     RPR_DONE = 0,
     RPR_ERROR = 1,
     RPR_MORE = 2,
+
     RPR_OK_LINE = 3,
     RPR_ERROR_LINE = 4,
     RPR_BULK_NIL = 5,

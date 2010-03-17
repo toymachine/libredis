@@ -8,10 +8,11 @@
 typedef struct _Buffer Buffer;
 
 Buffer *Buffer_new(size_t size);
+Byte *Buffer_data(Buffer *buffer);
 int Buffer_dump(Buffer *buffer, int limit);
 int Buffer_flip(Buffer *buffer);
-int Buffer_position(Buffer *buffer);
-int Buffer_set_position(Buffer *buffer, int position);
+size_t Buffer_position(Buffer *buffer);
+int Buffer_set_position(Buffer *buffer, size_t position);
 int Buffer_set_limit(Buffer *buffer, int limit);
 int Buffer_remaining(Buffer *buffer);
 int Buffer_printf(Buffer *buffer, const char *format, ...);
