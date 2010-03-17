@@ -6,6 +6,7 @@
 #include "redis.h"
 #include "batch.h"
 #include "parser.h"
+#include "reply.h"
 
 int main2(void)
 {
@@ -94,6 +95,13 @@ int main(void) {
 
 	event_dispatch();
 
+	while(Batch_has_result(batch)) {
+		Reply *reply = Batch_next_result(batch);
+		switch(reply->type) {
+		default:
+			printf("unknown reply %d\n", reply->type);
+		}
+	}
 	printf("normal main done!");
 
 	return 0;

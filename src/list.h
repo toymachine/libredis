@@ -257,5 +257,6 @@ static inline void list_splice_init(struct list_head *list,
 	     &pos->member != (head); 					\
 	     pos = n, n = list_entry(n->member.next, typeof(*n), member))
 
+#define list_pop_T(type, member, head) list_entry(list_pop(head), type, member)
 
 #endif

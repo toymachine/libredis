@@ -17,17 +17,10 @@
 typedef struct _Redis Redis;
 
 Redis *Redis_get_instance();
-void *Redis_alloc(Redis *redis, size_t size);
+void *_Redis_alloc(Redis *redis, size_t size);
 
-#define REDIS_ALLOC(SIZE) Redis_alloc(Redis_get_instance(), SIZE)
-#define REDIS_ALLOC_T(T) (T *)Redis_alloc(Redis_get_instance(), sizeof(T))
-
-/*
-{
-  void *(*alloc)(size_t size);
-  void (*free)(void *address);
-} Alloc;
-*/
+#define Redis_alloc(SIZE) _Redis_alloc(Redis_get_instance(), SIZE)
+#define Redis_alloc_T(T) (T *)_Redis_alloc(Redis_get_instance(), sizeof(T))
 
 typedef char Byte;
 

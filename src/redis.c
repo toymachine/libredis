@@ -15,7 +15,7 @@ Redis *Redis_get_instance()
 	return &redis_instance;
 }
 
-void *Redis_alloc(Redis *redis, size_t size)
+void *_Redis_alloc(Redis *redis, size_t size)
 {
 	return malloc(size);
 }

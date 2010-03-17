@@ -155,21 +155,26 @@ void Connection_read_data(Connection *connection)
 	while(!list_empty(&connection->read_queue)) {
 		struct list_head *pos = list_last(&connection->read_queue);
 		Command *cmd = list_entry(pos, Command, list);
-		Buffer *read_buffer = cmd->read_buffer;
-		size_t res = Buffer_recv(read_buffer, connection->sockfd, DEFAULT_READ_BUFF_SIZE);
+		size_t res = Buffer_recv(cmd->read_buffer, connection->sockfd, DEFAULT_READ_BUFF_SIZE);
 		if(res == -1) {
 			abort(); //TODO
 		}
-		Buffer_dump(read_buffer, 64);
+		Buffer_dump(cmd->read_buffer, 64);
 		while(1) {
-			ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(read_buffer), Buffer_position(read_buffer));
+			ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(cmd->read_buffer), Buffer_position(cmd->read_buffer));
 			switch(rp_res) {
+			case RPR_DONE: {
+				goto parser_done;
+			}
 			case RPR_OK_LINE: {
 				cmd->reply = Reply_new();
 				cmd->reply->type = RT_OK;
-				cmd->reply->buffer = read_buffer;
+				cmd->reply->buffer = cmd->read_buffer;
 				cmd->reply->offset = ReplyParser_offset(connection->parser);
 				cmd->reply->len = ReplyParser_length(connection->parser);
+				pos = list_pop(&connection->read_queue);
+				cmd = list_entry(pos, Command, list);
+				Batch_add_reply(cmd->batch, cmd);
 				break;
 			}
 			default:
@@ -177,9 +182,10 @@ void Connection_read_data(Connection *connection)
 				abort();
 			}
 		}
-
+parser_done:
 		break;
 	}
+	printf("connection read queue empty: %d\n", connection->sockfd);
 }
 
 void Connection_handle_event(int fd, short flags, void *data)
@@ -209,7 +215,7 @@ void Connection_handle_event(int fd, short flags, void *data)
 
 Connection *Connection_new(const char *addr, int port)
 {
-	Connection *connection = REDIS_ALLOC_T(Connection);
+	Connection *connection = Redis_alloc_T(Connection);
 	connection->state = CS_CLOSED;
 
 	//cmd queues

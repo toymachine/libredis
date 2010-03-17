@@ -52,7 +52,7 @@ int ReplyParser_init(ReplyParser *rp)
 
 ReplyParser *ReplyParser_new()
 {
-	ReplyParser *rp = REDIS_ALLOC_T(ReplyParser);
+	ReplyParser *rp = Redis_alloc_T(ReplyParser);
 	ReplyParser_init(rp);
 	return rp;
 }

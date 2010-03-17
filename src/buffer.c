@@ -20,9 +20,9 @@ struct _Buffer
 
 Buffer *Buffer_new(size_t size)
 {
-	Buffer *buffer = REDIS_ALLOC_T(Buffer);
+	Buffer *buffer = Redis_alloc_T(Buffer);
 	buffer->buff_size = size;
-	buffer->buff = REDIS_ALLOC(size);
+	buffer->buff = Redis_alloc(size);
 	buffer->data = buffer->buff;
 	buffer->position = 0;
 	buffer->capacity = size;

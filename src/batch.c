@@ -7,29 +7,31 @@
 struct _Batch
 {
 	struct list_head write_queue; //commands queued for writing
+	struct list_head read_queue; //commands retired after reading
 	Buffer *write_buffer;
 	Buffer *read_buffer;
 };
 
 Batch *Batch_new()
 {
-	Batch *batch = REDIS_ALLOC_T(Batch);
+	Batch *batch = Redis_alloc_T(Batch);
 	batch->read_buffer = Buffer_new(DEFAULT_READ_BUFF_SIZE);
 	batch->write_buffer = Buffer_new(DEFAULT_WRITE_BUFF_SIZE);
 	INIT_LIST_HEAD(&batch->write_queue);
+	INIT_LIST_HEAD(&batch->read_queue);
 	return batch;
 }
 
 Reply *Reply_new()
 {
-	Reply *reply = REDIS_ALLOC_T(Reply);
+	Reply *reply = Redis_alloc_T(Reply);
 	INIT_LIST_HEAD(&reply->children);
 	return reply;
 }
 
 Command *Command_new()
 {
-	Command *command = REDIS_ALLOC_T(Command);
+	Command *command = Redis_alloc_T(Command);
 	return command;
 }
 
@@ -51,7 +53,6 @@ int Batch_write_command(Batch *batch, const char *format, ...)
 
 	list_add(&(cmd->list), &(batch->write_queue));
 
-	//Connection_write_data(connection);
 	return 0;
 }
 
@@ -59,6 +60,12 @@ int Batch_execute(Batch *batch, Connection *connection)
 {
 	printf("batch execute\n");
 	Connection_add_commands(connection, &batch->write_queue);
+	return 0;
 }
 
+int Batch_add_reply(Batch *batch, Command *cmd)
+{
+	list_add_tail(&(cmd->list), &(batch->read_queue));
+	return 0;
+}
 
