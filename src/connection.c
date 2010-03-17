@@ -234,6 +234,10 @@ Connection *Connection_new(const char *addr, int port)
 	connection->addr = addr;
 	connection->port = port;
 	connection->sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if(connection->sockfd == -1) {
+		printf("could not create socket\n");
+		abort();
+	}
 	event_set(&connection->event_read, connection->sockfd, EV_READ, &Connection_handle_event, (void *)connection);
 	event_set(&connection->event_write, connection->sockfd, EV_WRITE, &Connection_handle_event, (void *)connection);
 	//set socket in non-blocking mode

@@ -91,6 +91,7 @@ int main(void) {
 	Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "blaat", 3, "aap");
 	Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "piet", 7, "jaapaap");
 	Batch_write_command(batch, "GET %s\r\n", "blaat");
+	Batch_write_command(batch, "MGET %s %s %s\r\n", "blaat", "piet", "boe");
 
 	Batch_execute(batch, connection);
 
