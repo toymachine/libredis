@@ -8,11 +8,12 @@ Command *Command_new();
 Command *Command_list_last(struct list_head *head);
 Command *Command_list_pop(struct list_head *head);
 
-Buffer *Command_read_buffer(Command *cmd);
-Buffer *Command_write_buffer(Command *cmd);
-int Command_flip_buffer(Command *cmd);
+Reply *Command_reply(Command *cmd);
+Batch *Command_batch(Command *cmd);
 
-int Command_reply(Command *cmd, Reply *reply);
+int Command_prepare_buffer(Command *cmd);
+int Command_add_reply(Command *cmd, Reply *reply);
+
 int Connection_add_commands(Connection *connection, struct list_head *commands);
 
 #endif

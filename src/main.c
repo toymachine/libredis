@@ -95,15 +95,22 @@ int main(void) {
 
 	event_dispatch();
 
+	printf("after dispatch\n");
+
 	while(Batch_has_result(batch)) {
-		Reply *reply = Batch_next_result(batch);
+		Command *cmd = Batch_next_result(batch);
+		Reply *reply = Command_reply(cmd);
 		ReplyType reply_type = Reply_type(reply);
 		switch(reply_type) {
+		case RT_OK: {
+			printf("ok reply: %.*s\n", Reply_length(reply), Reply_data(reply));
+			break;
+		}
 		default:
 			printf("unknown reply %d\n", reply_type);
 		}
 	}
-	printf("normal main done!");
+	printf("normal main done!\n");
 
 	return 0;
 }

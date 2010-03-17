@@ -13,7 +13,9 @@ typedef enum _ReplyType
     RT_MULTIBULK = 6,
 } ReplyType;
 
-Reply *Reply_new(ReplyType type, Buffer *buffer, size_t offset, size_t len);
+Reply *Reply_new(ReplyType type, Command *cmd, size_t offset, size_t len);
 ReplyType Reply_type(Reply *reply);
+size_t Reply_length(Reply *reply);
+Byte *Reply_data(Reply *reply);
 
 #endif /* REPLY_H_ */

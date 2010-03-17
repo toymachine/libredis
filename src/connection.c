@@ -14,6 +14,7 @@
 #include "command.h"
 #include "reply.h"
 #include "parser.h"
+#include "batch.h"
 
 typedef enum _ConnectionState
 {
@@ -60,7 +61,7 @@ int Connection_buffer_next_command(Connection *connection)
 {
 	if(!list_empty(&connection->write_queue)) {
 		Command *cmd = Command_list_last(&connection->write_queue);
-		Command_flip_buffer(cmd);
+		Command_prepare_buffer(cmd);
 		return 1;
 	}
 	else {
@@ -112,7 +113,7 @@ void Connection_write_data(Connection *connection)
 
 		while(!list_empty(&connection->write_queue)) {
 			Command *cmd = Command_list_last(&connection->write_queue);
-			Buffer *buffer = Command_write_buffer(cmd);
+			Buffer *buffer = Batch_write_buffer(Command_batch(cmd));
 			while(Buffer_remaining(buffer)) {
 				//still something to write
 				size_t res = Buffer_send(buffer, connection->sockfd);
@@ -150,25 +151,28 @@ void Connection_read_data(Connection *connection)
 {
 	printf("connection read fd: %d\n", connection->sockfd);
 
+start:
 	while(!list_empty(&connection->read_queue)) {
 		Command *cmd = Command_list_last(&connection->read_queue);
-		size_t res = Buffer_recv(Command_read_buffer(cmd), connection->sockfd, DEFAULT_READ_BUFF_SIZE);
+		Batch *batch = Command_batch(cmd);
+		Buffer *buffer= Batch_read_buffer(batch);
+		size_t res = Buffer_recv(buffer, connection->sockfd, DEFAULT_READ_BUFF_SIZE);
 		if(res == -1) {
 			abort(); //TODO
 		}
-		Buffer_dump(Command_read_buffer(cmd), 64);
+		Buffer_dump(buffer, 64);
 		while(1) {
-			ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(Command_read_buffer(cmd)), Buffer_position(Command_read_buffer(cmd)));
+			printf("exec rp\n");
+			ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(buffer), Buffer_position(buffer));
 			switch(rp_res) {
 			case RPR_DONE: {
-				goto parser_done;
+				goto start;
 			}
 			case RPR_OK_LINE: {
-				Reply *reply = Reply_new(RT_OK, Command_read_buffer(cmd),
-									ReplyParser_offset(connection->parser), ReplyParser_length(connection->parser));
-				Command_reply(cmd, reply);
+				Reply *reply = Reply_new(RT_OK, cmd, ReplyParser_offset(connection->parser), ReplyParser_length(connection->parser));
 				Command_list_pop(&connection->read_queue);
-				//Batch_add_reply(cmd->batch, cmd);
+				Command_add_reply(cmd, reply);
+				cmd = Command_list_last(&connection->read_queue);
 				break;
 			}
 			default:
@@ -176,8 +180,6 @@ void Connection_read_data(Connection *connection)
 				abort();
 			}
 		}
-parser_done:
-		break;
 	}
 	printf("connection read queue empty: %d\n", connection->sockfd);
 }

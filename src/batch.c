@@ -18,8 +18,7 @@ struct _Command
 	struct list_head list;
 
 	Batch *batch;
-	Buffer *write_buffer;
-	Buffer *read_buffer;
+
 	size_t offset;
 	size_t len;
 
@@ -32,7 +31,8 @@ struct _Reply
 	struct list_head list;
 
 	ReplyType type;
-	Buffer *buffer;
+	Command *cmd;
+
 	size_t offset;
 	size_t len;
 
@@ -50,15 +50,26 @@ Batch *Batch_new()
 	return batch;
 }
 
-Reply *Reply_new(ReplyType type, Buffer *buffer, size_t offset, size_t len)
+Reply *Reply_new(ReplyType type, Command *cmd, size_t offset, size_t len)
 {
 	Reply *reply = Redis_alloc_T(Reply);
 	reply->type = type;
-	reply->buffer = buffer;
+	reply->cmd = cmd;
 	reply->offset = offset;
 	reply->len = len;
 	INIT_LIST_HEAD(&reply->children);
 	return reply;
+}
+
+size_t Reply_length(Reply *reply)
+{
+	return reply->len;
+}
+
+Byte *Reply_data(Reply *reply)
+{
+	Byte *data = Buffer_data(Batch_read_buffer(Command_batch(reply->cmd)));
+	return data + reply->offset;
 }
 
 ReplyType Reply_type(Reply *reply)
@@ -85,27 +96,29 @@ Command *Command_list_pop(struct list_head *head)
 	return list_entry(pos, Command, list);
 }
 
-Buffer *Command_read_buffer(Command *cmd)
+Reply *Command_reply(Command *cmd)
 {
-	return cmd->read_buffer;
+	return cmd->reply;
 }
 
-Buffer *Command_write_buffer(Command *cmd)
+Batch *Command_batch(Command *cmd)
 {
-	return cmd->write_buffer;
+	return cmd->batch;
 }
 
-int Command_flip_buffer(Command *cmd)
+int Command_prepare_buffer(Command *cmd)
 {
-	Buffer *buffer = cmd->write_buffer;
+	Buffer *buffer = cmd->batch->write_buffer;
 	Buffer_set_position(buffer, cmd->offset);
 	Buffer_set_limit(buffer, cmd->offset + cmd->len);
+	return 0;
 }
 
-int Command_reply(Command *cmd, Reply *reply)
+int Command_add_reply(Command *cmd, Reply *reply)
 {
 	cmd->reply = reply;
-	list_add_tail(&(cmd->list), &(cmd->batch->read_queue));
+	printf("add cmd back to batch, len: %d, off: %d\n", cmd->len, cmd->offset);
+	list_add_tail(&cmd->list, &cmd->batch->read_queue);
 	return 0;
 }
 
@@ -120,8 +133,6 @@ int Batch_write_command(Batch *batch, const char *format, ...)
 
 	Command *cmd = Command_new();
 	cmd->batch = batch;
-	cmd->write_buffer = batch->write_buffer;
-	cmd->read_buffer = batch->read_buffer;
 	cmd->offset = offset;
 	cmd->len = len;
 
@@ -139,17 +150,28 @@ int Batch_execute(Batch *batch, Connection *connection)
 
 int Batch_has_result(Batch *batch)
 {
-	return !list_empty(&(batch->read_queue));
+	return !list_empty(&batch->read_queue);
 }
 
 Command *Batch_next_result(Batch *batch)
 {
 	if(Batch_has_result(batch)) {
-		return list_pop_T(Command, list, &(batch->read_queue));
+		return list_pop_T(Command, list, &batch->read_queue);
 	}
 	else {
 		return NULL;
 	}
 }
+
+Buffer *Batch_read_buffer(Batch *batch)
+{
+	return batch->read_buffer;
+}
+
+Buffer *Batch_write_buffer(Batch *batch)
+{
+	return batch->write_buffer;
+}
+
 
 
