@@ -15,13 +15,13 @@ struct _ReplyParser
     int cs; //state
     int bulk_count; //number of chars to read for current binary safe bulk-value
     int multibulk_count; //the number of bulk replies to read for the current multibulk reply
-    size_t mark; //helper to mark start of interesting data
+    Reply *multibulk_reply;
 
-    size_t offset;
-    size_t len;
+    size_t mark; //helper to mark start of interesting data
 
 };
 
+/*
 size_t ReplyParser_length(ReplyParser *rp)
 {
 	return rp->len;
@@ -36,16 +36,17 @@ int ReplyParser_multibulk_count(ReplyParser *rp)
 {
 	return rp->multibulk_count;
 }
+*/
 
 int ReplyParser_init(ReplyParser *rp)
 {  
     rp->p = 0;
     rp->cs = 0;  
     rp->bulk_count = 0;
-    rp->multibulk_count = 0;
     rp->mark = 0;
-    rp->offset = 0;
-    rp->len = 0;
+
+    rp->multibulk_count = 0;
+    rp->multibulk_reply = NULL;
 
     return 0;   
 }
@@ -58,10 +59,11 @@ ReplyParser *ReplyParser_new()
 }
 
 
-ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len)
+ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len, Reply **reply)
 {    
     while((rp->p) < len) {
-        Byte c = buffer[rp->p];
+    	*reply = NULL;
+    	Byte c = buffer[rp->p];
         //printf("cs: %d, char: %d\n", rp->cs, c);
         switch(rp->cs) {
             case 0: {
@@ -111,9 +113,8 @@ ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len)
                     rp->p++;
                     rp->cs = 0;
                     //report line data
-                    rp->offset = rp->mark;  
-                    rp->len = rp->p - rp->mark - 2;
-                    return RPR_OK_LINE;
+                    *reply = Reply_new(RT_OK, buffer, rp->mark, rp->p - rp->mark - 2);
+                    return RPR_REPLY;
                 }
                 break;
             }
@@ -137,9 +138,8 @@ ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len)
                     rp->p++;
                     rp->cs = 0;
                     //report error line data
-                    rp->offset = rp->mark;  
-                    rp->len = rp->p - rp->mark - 2;
-                    return RPR_ERROR_LINE;
+                    *reply = Reply_new(RT_ERROR, buffer, rp->mark, rp->p - rp->mark - 2);
+                    return RPR_REPLY;
                 }
                 break;
             }
@@ -181,10 +181,23 @@ ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len)
                 if(c == LF) {
                     rp->p++;
                     rp->cs = 0;
+                    *reply = Reply_new(RT_BULK_NIL, buffer, 0, 0);
                     if(rp->multibulk_count > 0) {
                         rp->multibulk_count -= 1;
+                        assert(rp->multibulk_reply != NULL);
+                        Reply_add_child(rp->multibulk_reply, *reply);
+                        if(rp->multibulk_count == 0) {
+                        	*reply = rp->multibulk_reply;
+                        	rp->multibulk_reply = NULL;
+                        	return RPR_REPLY;
+                        }
+                        else {
+                        	continue;
+                        }
                     }
-                    return RPR_BULK_NIL;
+                    else {
+                        return RPR_REPLY;
+                    }
                 }
                 break;
             }
@@ -232,12 +245,23 @@ ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len)
                     assert(rp->bulk_count == 0);
                     rp->p++;
                     rp->cs = 0;
+                    *reply = Reply_new(RT_BULK, buffer, rp->mark, rp->p - rp->mark - 2);
                     if(rp->multibulk_count > 0) {
                         rp->multibulk_count -= 1;
+                        assert(rp->multibulk_reply != NULL);
+                        Reply_add_child(rp->multibulk_reply, *reply);
+                        if(rp->multibulk_count == 0) {
+                        	*reply = rp->multibulk_reply;
+                        	rp->multibulk_reply = NULL;
+                        	return RPR_REPLY;
+                        }
+                        else {
+                        	continue;
+                        }
                     }
-                    rp->offset = rp->mark;
-                    rp->len = rp->p - rp->mark - 2;
-                    return RPR_BULK_VALUE;
+                    else {
+                        return RPR_REPLY;
+                    }
                 }
                 break;
             }
@@ -277,7 +301,8 @@ ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len)
                 if(c == LF) {
                     rp->p++;
                     rp->cs = 0;
-                    return RPR_MULTIBULK_NIL; 
+                    *reply = Reply_new(RT_MULTIBULK_NIL, NULL, 0, 0);
+                    return RPR_REPLY;
                 }
                 break;
             }
@@ -285,9 +310,10 @@ ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len)
             case 17: {
                 if(c == CR) { //end of digits
                     rp->multibulk_count = atoi(buffer + rp->mark);
+                    rp->multibulk_reply = Reply_new(RT_MULTIBULK, NULL, 0, rp->multibulk_count);
                     rp->p++;
                     rp->cs = 18;
-                    return RPR_MULTIBULK_COUNT;
+                    continue;
                 }
                 else if(isdigit(c)) { //one more digit
                     rp->p++;

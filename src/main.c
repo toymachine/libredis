@@ -7,80 +7,7 @@
 #include "batch.h"
 #include "parser.h"
 #include "reply.h"
-
-int main2(void)
-{
-	printf("bla\n");
-
-	//Alloc alloc = { Alloc_alloc, Alloc_free };
-
-    ReplyParser *rp = ReplyParser_new();
-
-
-    //char *buffer = "+blaat aap\r\n";
-    //char *buffer = "-blaat aap\r\n";
-    //char *buffer = "$-1\r\n";
-    //char *buffer = "$7\r\naappiet\r\n";
-    //char *buffer = "*-1\r\n";
-    char *buffer = "*3\r\n$4\r\nbar1\r\n$4\r\nbar2\r\n$4\r\nbar3\r\n";
-    //char *buffer = "*3\r\n$4\r\nbar1\r\n$4\r\nbar2\r\n-blaatbar3\r\n";
-    //Byte *buffer = (Byte *)"*3\r\n$4\r\nbar1\r\n$4\r\nbar2\r\n$-1\r\n$4\r\nbar4\r\n+blaatbar\r\n-errorbar\r\n*-1\r\n";
-
-    //printf("buffer '%s'\n", buffer);
-
-    //res = ReplyParser_execute(&rp, buffer, 0);
-    //printf("res: %d, cs: %d\n", res, rp->cs);
-    //res = ReplyParser_execute(&rp, buffer, strlen(buffer) - 30);
-    //printf("res: %d, cs: %d\n", res, rp->cs);
-    int n = strlen(buffer);
-    while(1) {
-        ReplyParserResult res = ReplyParser_execute(rp, buffer, n);
-        switch(res) {
-        case RPR_ERROR: {
-            printf("error!\n");
-            return 0;
-        }
-        case RPR_DONE: {
-            printf("done.\n");
-            return 0;
-        }
-        case RPR_OK_LINE: {
-            printf("ok reply, '%.*s'\n", ReplyParser_length(rp), buffer + ReplyParser_offset(rp));
-            break;
-        }
-        case RPR_ERROR_LINE: {
-            printf("error reply, '%.*s'\n", ReplyParser_length(rp), buffer + ReplyParser_offset(rp));
-            break;
-        }
-        case RPR_BULK_NIL: {
-            printf("nil bulk reply\n");
-            break;
-        }
-        case RPR_BULK_VALUE: {
-            printf("bulk reply, '%.*s'\n", ReplyParser_length(rp), buffer + ReplyParser_offset(rp));
-            break;
-        }
-        case RPR_MULTIBULK_COUNT: {
-            printf("multibulk reply , items: %d\n", ReplyParser_multibulk_count(rp));
-            break;
-        }
-        case RPR_MULTIBULK_NIL: {
-            printf("multibulk nil\n");
-            break;
-        }
-        case RPR_MORE: {
-            printf("more...");
-            return 0;
-        }
-        default: {
-            printf("unknown exit\n");
-            return 0;
-        }
-        }
-        //printf("res: %d, cs: %d\n", res, rp->cs);
-    }
-    return 0;
-}
+#include "assert.h"
 
 int main(void) {
 	event_init();
@@ -92,6 +19,7 @@ int main(void) {
 	Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "piet", 7, "jaapaap");
 	Batch_write_command(batch, "GET %s\r\n", "blaat");
 	Batch_write_command(batch, "MGET %s %s %s\r\n", "blaat", "piet", "boe");
+	Batch_write_command(batch, "GET %s\r\n", "blaat2");
 
 	Batch_execute(batch, connection);
 
@@ -101,20 +29,9 @@ int main(void) {
 
 	while(Batch_has_result(batch)) {
 		Reply *reply = Batch_next_result(batch);
-		ReplyType reply_type = Reply_type(reply);
-		switch(reply_type) {
-		case RT_OK: {
-			printf("ok reply: %.*s\n", Reply_length(reply), Reply_data(reply));
-			break;
-		}
-		case RT_BULK: {
-			printf("bulk reply: %.*s\n", Reply_length(reply), Reply_data(reply));
-			break;
-		}
-		default:
-			printf("unknown reply %d\n", reply_type);
-		}
+		Reply_dump(reply);
 	}
+
 	printf("normal main done!\n");
 
 	return 0;

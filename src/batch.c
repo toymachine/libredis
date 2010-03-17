@@ -1,9 +1,11 @@
+#include <stdio.h>
+#include <assert.h>
+
 #include "common.h"
 #include "batch.h"
 #include "list.h"
 #include "command.h"
 #include "reply.h"
-#include <stdio.h>
 
 struct _Batch
 {
@@ -33,11 +35,12 @@ struct _Reply
 	ReplyType type;
 	Command *cmd;
 
+	Byte *data;
 	size_t offset;
 	size_t len;
 
 	struct list_head children;
-
+	struct list_head *current;
 };
 
 Batch *Batch_new()
@@ -50,15 +53,36 @@ Batch *Batch_new()
 	return batch;
 }
 
-Reply *Reply_new(ReplyType type, Command *cmd, size_t offset, size_t len)
+Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len)
 {
 	Reply *reply = Redis_alloc_T(Reply);
 	reply->type = type;
-	reply->cmd = cmd;
+	reply->data = data;
 	reply->offset = offset;
 	reply->len = len;
+	reply->cmd = NULL;
 	INIT_LIST_HEAD(&reply->children);
+	reply->current = &reply->children;
 	return reply;
+}
+
+int Reply_add_child(Reply *reply, Reply *child)
+{
+	list_add_tail(&child->list, &reply->children);
+	return 0;
+}
+
+int Reply_next_child(Reply *reply, Reply **child)
+{
+	reply->current = reply->current->next;
+	if(reply->current == &reply->children) {
+		*child = NULL;
+		return 0;
+	}
+	else {
+		*child = list_entry(reply->current, Reply, list);
+		return 1;
+	}
 }
 
 size_t Reply_length(Reply *reply)
@@ -68,8 +92,8 @@ size_t Reply_length(Reply *reply)
 
 Byte *Reply_data(Reply *reply)
 {
-	Byte *data = Buffer_data(Batch_read_buffer(Command_batch(reply->cmd)));
-	return data + reply->offset;
+	assert(reply->data != NULL);
+	return reply->data + reply->offset;
 }
 
 ReplyType Reply_type(Reply *reply)
@@ -77,6 +101,44 @@ ReplyType Reply_type(Reply *reply)
 	return reply->type;
 }
 
+int Reply_dump(Reply *reply) {
+	ReplyType reply_type = Reply_type(reply);
+	switch(reply_type) {
+	case RT_OK: {
+		printf("ok reply: %.*s\n", Reply_length(reply), Reply_data(reply));
+		break;
+	}
+	case RT_BULK: {
+		printf("bulk reply: %.*s\n", Reply_length(reply), Reply_data(reply));
+		break;
+	}
+	case RT_BULK_NIL: {
+		printf("bulk nil\n");
+		break;
+	}
+	case RT_MULTIBULK: {
+		printf("multi bulk reply, count: %d\n", Reply_length(reply));
+		Reply *child = NULL;
+		while(Reply_next_child(reply, &child)) {
+			assert(child != NULL);
+			ReplyType child_type = Reply_type(child);
+			if(RT_BULK == child_type) {
+				printf("\tbulk reply: %.*s\n", Reply_length(child), Reply_data(child));
+			}
+			else if(RT_BULK_NIL == child_type) {
+				printf("\tbulk nil\n");
+			}
+			else {
+				assert(0);
+			}
+		}
+		break;
+	}
+	default:
+		printf("unknown reply %d\n", reply_type);
+	}
+	return 0;
+}
 
 Command *Command_new()
 {
@@ -117,6 +179,7 @@ int Command_prepare_buffer(Command *cmd)
 int Command_add_reply(Command *cmd, Reply *reply)
 {
 	cmd->reply = reply;
+	reply->cmd = cmd;
 	printf("add cmd back to batch, len: %d, off: %d\n", cmd->len, cmd->offset);
 	list_add(&cmd->list, &cmd->batch->read_queue);
 	return 0;

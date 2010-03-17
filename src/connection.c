@@ -164,20 +164,17 @@ start:
 		Buffer_dump(buffer, 64);
 		while(1) {
 			printf("exec rp\n");
-			ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(buffer), Buffer_position(buffer));
+			Reply *reply = NULL;
+			ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(buffer), Buffer_position(buffer), &reply);
 			switch(rp_res) {
 			case RPR_DONE: {
 				goto start;
 			}
-			case RPR_OK_LINE: {
-				Reply *reply = Reply_new(RT_OK, cmd, ReplyParser_offset(connection->parser), ReplyParser_length(connection->parser));
-				Command_list_pop(&connection->read_queue);
-				Command_add_reply(cmd, reply);
-				cmd = Command_list_last(&connection->read_queue);
-				break;
+			case RPR_ERROR: {
+				printf("result parse error!");
+				abort();
 			}
-			case RPR_BULK_VALUE: {
-				Reply *reply = Reply_new(RT_BULK, cmd, ReplyParser_offset(connection->parser), ReplyParser_length(connection->parser));
+			case RPR_REPLY: {
 				Command_list_pop(&connection->read_queue);
 				Command_add_reply(cmd, reply);
 				cmd = Command_list_last(&connection->read_queue);
