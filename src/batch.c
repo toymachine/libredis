@@ -118,7 +118,7 @@ int Command_add_reply(Command *cmd, Reply *reply)
 {
 	cmd->reply = reply;
 	printf("add cmd back to batch, len: %d, off: %d\n", cmd->len, cmd->offset);
-	list_add_tail(&cmd->list, &cmd->batch->read_queue);
+	list_add(&cmd->list, &cmd->batch->read_queue);
 	return 0;
 }
 
@@ -153,10 +153,11 @@ int Batch_has_result(Batch *batch)
 	return !list_empty(&batch->read_queue);
 }
 
-Command *Batch_next_result(Batch *batch)
+Reply *Batch_next_result(Batch *batch)
 {
 	if(Batch_has_result(batch)) {
-		return list_pop_T(Command, list, &batch->read_queue);
+		Command *cmd = list_pop_T(Command, list, &batch->read_queue);
+		return cmd->reply;
 	}
 	else {
 		return NULL;

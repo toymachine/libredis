@@ -83,10 +83,14 @@ int Buffer_set_limit(Buffer *buffer, int limit)
 	return 0;
 }
 
-int Buffer_ensure_remaining(Buffer *buffer, int len)
+int Buffer_grow(Buffer *buffer)
 {
-	if(Buffer_remaining(buffer) < len) {
-		//todo
+	size_t min_remaining = 0.2 * buffer->capacity;
+	size_t remaining = Buffer_remaining(buffer);
+	printf("min remaingng: %d, rem: %d\n", min_remaining, remaining);
+	if(remaining < min_remaining) {
+		printf("TODO grow buffer\n");
+		abort();//TODO
 	};
 	return Buffer_remaining(buffer);
 }
@@ -106,16 +110,11 @@ size_t Buffer_send(Buffer *buffer, int fd)
 	return bytes_written;
 }
 
-size_t Buffer_recv(Buffer *buffer, int fd, size_t len)
+size_t Buffer_recv(Buffer *buffer, int fd)
 {
+	Buffer_grow(buffer);
 	printf("Buffer_recv fd: %d, position: %d, limit: %d, remaining: %d\n", fd, buffer->position, buffer->limit, Buffer_remaining(buffer));
-	if(len == -1) {
-		len = Buffer_remaining(buffer);
-	}
-	else {
-		len = MIN(Buffer_ensure_remaining(buffer, len), len);
-	}
-	size_t bytes_read = read(fd, buffer->data + buffer->position, len);
+	size_t bytes_read = read(fd, buffer->data + buffer->position, Buffer_remaining(buffer));
 	printf("Buffer_recv fd: %d, bytes_read: %d\n", fd, bytes_read);
 	if(bytes_read == -1) {
 		printf("Buffer_recv error fd: %d err: %d\n", fd, errno);
@@ -138,7 +137,7 @@ int Buffer_vprintf(Buffer *buffer, const char *format, va_list args)
 	int remaining = buffer->limit - buffer->position;
 	int written = vsnprintf(buffer->data + buffer->position, remaining, format, args);
 	if(written > remaining) {
-		Buffer_ensure_remaining(buffer, written);
+		Buffer_grow(buffer);
 		remaining = buffer->limit - buffer->position;
 		written = vsnprintf(buffer->data + buffer->position, remaining, format, args);
 		//TODO check written again

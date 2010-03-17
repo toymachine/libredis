@@ -90,6 +90,7 @@ int main(void) {
 	Batch *batch = Batch_new();
 	Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "blaat", 3, "aap");
 	Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "piet", 7, "jaapaap");
+	Batch_write_command(batch, "GET %s\r\n", "blaat");
 
 	Batch_execute(batch, connection);
 
@@ -98,12 +99,15 @@ int main(void) {
 	printf("after dispatch\n");
 
 	while(Batch_has_result(batch)) {
-		Command *cmd = Batch_next_result(batch);
-		Reply *reply = Command_reply(cmd);
+		Reply *reply = Batch_next_result(batch);
 		ReplyType reply_type = Reply_type(reply);
 		switch(reply_type) {
 		case RT_OK: {
 			printf("ok reply: %.*s\n", Reply_length(reply), Reply_data(reply));
+			break;
+		}
+		case RT_BULK: {
+			printf("bulk reply: %.*s\n", Reply_length(reply), Reply_data(reply));
 			break;
 		}
 		default:

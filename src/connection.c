@@ -43,7 +43,7 @@ void Connection_event_add(Connection *connection, struct event *event, long int 
 	tv.tv_sec = tv_sec;
 	tv.tv_usec = tv_usec;
 	int res = event_add(event, &tv);
-	printf("connection ev add: fd: %d, res: %d\n", connection->sockfd, res);
+	printf("connection ev add: fd: %d, type: %c, res: %d\n", connection->sockfd, event == &connection->event_read ? 'R' : 'W', res);
 }
 
 
@@ -156,8 +156,9 @@ start:
 		Command *cmd = Command_list_last(&connection->read_queue);
 		Batch *batch = Command_batch(cmd);
 		Buffer *buffer= Batch_read_buffer(batch);
-		size_t res = Buffer_recv(buffer, connection->sockfd, DEFAULT_READ_BUFF_SIZE);
+		size_t res = Buffer_recv(buffer, connection->sockfd);
 		if(res == -1) {
+			printf("todo read EAGAIN\n");
 			abort(); //TODO
 		}
 		Buffer_dump(buffer, 64);
@@ -170,6 +171,13 @@ start:
 			}
 			case RPR_OK_LINE: {
 				Reply *reply = Reply_new(RT_OK, cmd, ReplyParser_offset(connection->parser), ReplyParser_length(connection->parser));
+				Command_list_pop(&connection->read_queue);
+				Command_add_reply(cmd, reply);
+				cmd = Command_list_last(&connection->read_queue);
+				break;
+			}
+			case RPR_BULK_VALUE: {
+				Reply *reply = Reply_new(RT_BULK, cmd, ReplyParser_offset(connection->parser), ReplyParser_length(connection->parser));
 				Command_list_pop(&connection->read_queue);
 				Command_add_reply(cmd, reply);
 				cmd = Command_list_last(&connection->read_queue);
@@ -193,6 +201,7 @@ void Connection_handle_event(int fd, short flags, void *data)
 
 	if(flags & EV_WRITE) {
 		if(flags & EV_TIMEOUT) {
+			printf("TODO write timeout");
 			abort();
 		}
 		Connection_write_data(connection);
@@ -200,6 +209,7 @@ void Connection_handle_event(int fd, short flags, void *data)
 
 	if(flags & EV_READ) {
 		if(flags & EV_TIMEOUT) {
+			printf("TODO read timeout");
 			abort();
 		}
 		Connection_read_data(connection);
@@ -230,10 +240,12 @@ Connection *Connection_new(const char *addr, int port)
 	int flags;
 	if ((flags = fcntl(connection->sockfd, F_GETFL, 0)) < 0)
 	{
+		printf("TODO error on nonblock fcntl\n");
 		abort();
 	}
 	if (fcntl(connection->sockfd, F_SETFL, flags | O_NONBLOCK) < 0)
 	{
+		printf("TODO error on nonblock fcntl\n");
 		abort();
 	}
 
