@@ -21,24 +21,7 @@ struct _ReplyParser
 
 };
 
-/*
-size_t ReplyParser_length(ReplyParser *rp)
-{
-	return rp->len;
-}
-
-size_t ReplyParser_offset(ReplyParser *rp)
-{
-	return rp->offset;
-}
-
-int ReplyParser_multibulk_count(ReplyParser *rp)
-{
-	return rp->multibulk_count;
-}
-*/
-
-int ReplyParser_init(ReplyParser *rp)
+int ReplyParser_reset(ReplyParser *rp)
 {  
     rp->p = 0;
     rp->cs = 0;  
@@ -55,7 +38,7 @@ ReplyParser *ReplyParser_new()
 {
 	DEBUG(("alloc ReplyParser\n"));
 	ReplyParser *rp = Redis_alloc_T(ReplyParser);
-	ReplyParser_init(rp);
+	ReplyParser_reset(rp);
 	return rp;
 }
 
@@ -69,6 +52,8 @@ int ReplyParser_free(ReplyParser *rp)
 
 ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len, Reply **reply)
 {    
+	DEBUG(("enter rp exec, rp->p: %d, len: %d, cs: %d\n", rp->p, len, rp->cs));
+	assert(rp->p <= len);
     while((rp->p) < len) {
     	*reply = NULL;
     	Byte c = buffer[rp->p];
@@ -341,8 +326,9 @@ ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len,
         }
         return RPR_ERROR;
     }
+    DEBUG(("exit rp pos: %d len: %d cs: %d\n", rp->p, len, rp->cs));
     assert(rp->p == len);
-    //printf("exec exit pos: %d len: %d cs: %d\n", rp->p, len, rp->cs);
+    assert(len > 0 ? (rp->cs != 0) : 1);
     return rp->cs == 0 ? RPR_DONE : RPR_MORE;
 }
 

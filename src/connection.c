@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "common.h"
 #include "buffer.h"
@@ -34,9 +35,59 @@ struct _Connection
 	struct event event_write;
 	struct list_head write_queue; //commands queued for writing
 	struct list_head read_queue; //commands queued for reading
+	Batch *current_read_batch;
 	ReplyParser *parser;
 	Batch *last_batch;
 };
+
+void Connection_handle_event(int fd, short flags, void *data);
+
+Connection *Connection_new(const char *addr, int port)
+{
+	DEBUG(("alloc Connection\n"));
+	Connection *connection = Redis_alloc_T(Connection);
+	connection->state = CS_CLOSED;
+
+	//cmd queues
+	INIT_LIST_HEAD(&connection->write_queue);
+	INIT_LIST_HEAD(&connection->read_queue);
+	connection->current_read_batch = NULL;
+
+	connection->parser = ReplyParser_new();
+
+	//socket stuff:
+	connection->addr = addr;
+	connection->port = port;
+	connection->sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if(connection->sockfd == -1) {
+		printf("could not create socket\n");
+		abort();
+	}
+	event_set(&connection->event_read, connection->sockfd, EV_READ, &Connection_handle_event, (void *)connection);
+	event_set(&connection->event_write, connection->sockfd, EV_WRITE, &Connection_handle_event, (void *)connection);
+	//set socket in non-blocking mode
+	int flags;
+	if ((flags = fcntl(connection->sockfd, F_GETFL, 0)) < 0)
+	{
+		printf("TODO error on nonblock fcntl\n");
+		abort();
+	}
+	if (fcntl(connection->sockfd, F_SETFL, flags | O_NONBLOCK) < 0)
+	{
+		printf("TODO error on nonblock fcntl\n");
+		abort();
+	}
+
+	return connection;
+}
+
+int Connection_free(Connection *connection)
+{
+	ReplyParser_free(connection->parser);
+	DEBUG(("dealloc Connection\n"));
+	Redis_free_T(connection, Connection);
+	return 0;
+}
 
 void Connection_event_add(Connection *connection, struct event *event, long int tv_sec, long int tv_usec)
 {
@@ -125,13 +176,14 @@ void Connection_write_data(Connection *connection)
 						return;
 					}
 					else {
-						DEBUG(("send error, errno: %d\n", errno));
+						printf("send error, errno: %d\n", errno);
 						abort();
 					}
 				}
 			}
 			//command written
-			struct list_head *pos = list_pop(&connection->write_queue);
+			struct list_head *pos;
+			pos = list_pop(&connection->write_queue);
 			list_add(pos, &connection->read_queue);
 			Connection_event_add(connection, &connection->event_read, 0, 400000);
 			Connection_buffer_next_command(connection);
@@ -150,50 +202,60 @@ int Connection_add_commands(Connection *connection, struct list_head *commands)
 
 void Connection_read_data(Connection *connection)
 {
-	DEBUG(("connection read fd: %d\n", connection->sockfd));
+	DEBUG(("connection read data fd: %d\n", connection->sockfd));
+	assert(!list_empty(&connection->read_queue));
 
-start:
+	//TODO situation end of batch, or new batch, in that case we need to reset reply parser
+	//and or save any leftovers already received in buf and add it to the buff of the next batch
+
 	while(!list_empty(&connection->read_queue)) {
+		DEBUG(("exec rp\n"));
 		Command *cmd = Command_list_last(&connection->read_queue);
 		Batch *batch = Command_batch(cmd);
-		Buffer *buffer= Batch_read_buffer(batch);
-		size_t res = Buffer_recv(buffer, connection->sockfd);
-		if(res == -1) {
-			printf("todo read EAGAIN\n");
-			abort(); //TODO
+		assert(batch != NULL);
+		Buffer *buffer = Batch_read_buffer(batch);
+		assert(buffer != NULL);
+		Reply *reply = NULL;
+		ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(buffer), Buffer_position(buffer), &reply);
+		switch(rp_res) {
+		case RPR_ERROR: {
+			printf("result parse error!");
+			abort();
 		}
+		case RPR_DONE: {
+			assert(!list_empty(&connection->read_queue));
+			//fall trough to more case, e.g. we need more data
+		}
+		case RPR_MORE: {
+			size_t res = Buffer_recv(buffer, connection->sockfd);
 #ifndef NDEBUG
 		Buffer_dump(buffer, 128);
 #endif
-		while(1) {
-			DEBUG(("exec rp\n"));
-			Reply *reply = NULL;
-			ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(buffer), Buffer_position(buffer), &reply);
-			switch(rp_res) {
-			case RPR_DONE: {
-				goto start;
+			if(res == -1) {
+				if(errno == EAGAIN) {
+					Connection_event_add(connection, &connection->event_read, 0, 400000);
+					goto exit;
+				}
+				else {
+					printf("unhandeld read io err: %d\n", errno);
+					abort(); //TODO
+				}
 			}
-			case RPR_ERROR: {
-				printf("result parse error!");
-				abort();
-			}
-			case RPR_MORE: {
-				printf("TODO handle more\n");
-				abort();
-			}
-			case RPR_REPLY: {
-				Command_list_pop(&connection->read_queue);
-				Command_add_reply(cmd, reply);
-				cmd = Command_list_last(&connection->read_queue);
-				break;
-			}
-			default:
-				printf("unexpected/unhandled rp result: %d\n", rp_res);
-				abort();
-			}
+			break;
 		}
+		case RPR_REPLY: {
+			Command_list_pop(&connection->read_queue);
+			Command_add_reply(cmd, reply);
+			break;
+		}
+		default:
+			printf("unexpected/unhandled rp result: %d\n", rp_res);
+			abort();
+		}
+
 	}
-	DEBUG(("connection read queue empty: %d\n", connection->sockfd));
+exit:
+	DEBUG(("connection read data exit fd: %d\n", connection->sockfd));
 }
 
 void Connection_handle_event(int fd, short flags, void *data)
@@ -223,49 +285,4 @@ void Connection_handle_event(int fd, short flags, void *data)
 
 
 
-Connection *Connection_new(const char *addr, int port)
-{
-	DEBUG(("alloc Connection\n"));
-	Connection *connection = Redis_alloc_T(Connection);
-	connection->state = CS_CLOSED;
-
-	//cmd queues
-	INIT_LIST_HEAD(&connection->write_queue);
-	INIT_LIST_HEAD(&connection->read_queue);
-
-	connection->parser = ReplyParser_new();
-
-	//socket stuff:
-	connection->addr = addr;
-	connection->port = port;
-	connection->sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if(connection->sockfd == -1) {
-		printf("could not create socket\n");
-		abort();
-	}
-	event_set(&connection->event_read, connection->sockfd, EV_READ, &Connection_handle_event, (void *)connection);
-	event_set(&connection->event_write, connection->sockfd, EV_WRITE, &Connection_handle_event, (void *)connection);
-	//set socket in non-blocking mode
-	int flags;
-	if ((flags = fcntl(connection->sockfd, F_GETFL, 0)) < 0)
-	{
-		printf("TODO error on nonblock fcntl\n");
-		abort();
-	}
-	if (fcntl(connection->sockfd, F_SETFL, flags | O_NONBLOCK) < 0)
-	{
-		printf("TODO error on nonblock fcntl\n");
-		abort();
-	}
-
-	return connection;
-}
-
-int Connection_free(Connection *connection)
-{
-	ReplyParser_free(connection->parser);
-	DEBUG(("dealloc Connection\n"));
-	Redis_free_T(connection, Connection);
-	return 0;
-}
 

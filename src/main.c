@@ -18,6 +18,8 @@ int main(void) {
 
 	int i;
 	for(i = 0; i < N; i++) {
+		DEBUG(("round %d\n", i));
+
 		Batch *batch = Batch_new();
 		Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "blaat", 3, "aap");
 		Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "piet", 7, "jaapaap");
@@ -27,9 +29,11 @@ int main(void) {
 
 		Batch_execute(batch, connection);
 
+		DEBUG(("before dispatch\n"));
+
 		event_dispatch();
 
-		printf("after dispatch\n");
+		DEBUG(("after dispatch\n"));
 
 		while(Batch_has_result(batch)) {
 			Reply *reply = Batch_next_result(batch);
