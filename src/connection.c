@@ -35,6 +35,7 @@ struct _Connection
 	struct list_head write_queue; //commands queued for writing
 	struct list_head read_queue; //commands queued for reading
 	ReplyParser *parser;
+	Batch *last_batch;
 };
 
 void Connection_event_add(Connection *connection, struct event *event, long int tv_sec, long int tv_usec)
@@ -162,7 +163,7 @@ start:
 			abort(); //TODO
 		}
 #ifndef NDEBUG
-		Buffer_dump(buffer, 64);
+		Buffer_dump(buffer, 128);
 #endif
 		while(1) {
 			DEBUG(("exec rp\n"));
@@ -176,6 +177,10 @@ start:
 				printf("result parse error!");
 				abort();
 			}
+			case RPR_MORE: {
+				printf("TODO handle more\n");
+				abort();
+			}
 			case RPR_REPLY: {
 				Command_list_pop(&connection->read_queue);
 				Command_add_reply(cmd, reply);
@@ -183,7 +188,7 @@ start:
 				break;
 			}
 			default:
-				printf("unhandled rp result: %d\n", rp_res);
+				printf("unexpected/unhandled rp result: %d\n", rp_res);
 				abort();
 			}
 		}

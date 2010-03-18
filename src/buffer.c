@@ -24,6 +24,12 @@ Buffer *Buffer_new(size_t size)
 	Buffer *buffer = Redis_alloc_T(Buffer);
 	buffer->buff_size = size;
 	buffer->buff = Redis_alloc(size);
+#ifndef NDEBUG
+	int i;
+	for(i = 0; i < size; i++) {
+		buffer->buff[i] = 0xEA;
+	}
+#endif
 	buffer->data = buffer->buff;
 	buffer->position = 0;
 	buffer->capacity = size;
