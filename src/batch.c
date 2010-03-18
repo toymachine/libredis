@@ -45,6 +45,7 @@ struct _Reply
 
 Batch *Batch_new()
 {
+	DEBUG(("alloc Batch\n"));
 	Batch *batch = Redis_alloc_T(Batch);
 	batch->read_buffer = Buffer_new(DEFAULT_READ_BUFF_SIZE);
 	batch->write_buffer = Buffer_new(DEFAULT_WRITE_BUFF_SIZE);
@@ -55,6 +56,7 @@ Batch *Batch_new()
 
 Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len)
 {
+	DEBUG(("alloc Reply\n"));
 	Reply *reply = Redis_alloc_T(Reply);
 	reply->type = type;
 	reply->data = data;
@@ -64,6 +66,20 @@ Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len)
 	INIT_LIST_HEAD(&reply->children);
 	reply->current = &reply->children;
 	return reply;
+}
+
+int Reply_free(Reply *reply)
+{
+	while(!list_empty(&reply->children)) {
+		Reply *child = list_pop_T(Reply, list, &reply->children);
+		Reply_free(child);
+	}
+	if(reply->cmd) {
+		Command_free(reply->cmd);
+	}
+	DEBUG(("dealloc Reply\n"));
+	Redis_free_T(reply, Reply);
+	return 0;
 }
 
 int Reply_add_child(Reply *reply, Reply *child)
@@ -142,8 +158,15 @@ int Reply_dump(Reply *reply) {
 
 Command *Command_new()
 {
+	DEBUG(("alloc Command\n"));
 	Command *command = Redis_alloc_T(Command);
 	return command;
+}
+
+int Command_free(Command *command)
+{
+	DEBUG(("dealloc Command\n"));
+	Redis_free_T(command, Command);
 }
 
 Command *Command_list_last(struct list_head *head)
@@ -180,7 +203,7 @@ int Command_add_reply(Command *cmd, Reply *reply)
 {
 	cmd->reply = reply;
 	reply->cmd = cmd;
-	printf("add cmd back to batch, len: %d, off: %d\n", cmd->len, cmd->offset);
+	DEBUG(("add cmd back to batch, len: %d, off: %d\n", cmd->len, cmd->offset));
 	list_add(&cmd->list, &cmd->batch->read_queue);
 	return 0;
 }
@@ -206,7 +229,7 @@ int Batch_write_command(Batch *batch, const char *format, ...)
 
 int Batch_execute(Batch *batch, Connection *connection)
 {
-	printf("batch execute\n");
+	DEBUG(("batch execute\n"));
 	Connection_add_commands(connection, &batch->write_queue);
 	return 0;
 }

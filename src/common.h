@@ -10,6 +10,12 @@
 #define MAX_CONNECTIONS 1024
 #define MIN(a,b) ((a)>(b)?(b):(a))
 
+#ifndef NDEBUG
+#define DEBUG(args) (printf("DEBUG: "), printf args)
+#else
+#define DEBUG(args)
+#endif
+
 #define CR '\r'
 #define LF '\n'
 #define CRLF '\r\n'
@@ -24,8 +30,10 @@ typedef struct _Reply Reply;
 
 Redis *Redis_get_instance();
 void *_Redis_alloc(Redis *redis, size_t size);
+void _Redis_free(Redis *redis, void *obj, size_t size);
 
 #define Redis_alloc(SIZE) _Redis_alloc(Redis_get_instance(), SIZE)
 #define Redis_alloc_T(T) (T *)_Redis_alloc(Redis_get_instance(), sizeof(T))
+#define Redis_free_T(PT,T) _Redis_free(Redis_get_instance(), PT, sizeof(T))
 
 #endif

@@ -5,6 +5,7 @@
 #include "list.h"
 
 Command *Command_new();
+int Command_free(Command *command);
 Command *Command_list_last(struct list_head *head);
 Command *Command_list_pop(struct list_head *head);
 

@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "common.h"
@@ -17,7 +18,14 @@ Redis *Redis_get_instance()
 
 void *_Redis_alloc(Redis *redis, size_t size)
 {
+	DEBUG(("alloc: %d\n", size));
 	return malloc(size);
+}
+
+void _Redis_free(Redis *redis, void *obj, size_t size)
+{
+	DEBUG(("dealloc: %d\n", size));
+	free(obj);
 }
 
 

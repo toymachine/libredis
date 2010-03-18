@@ -20,6 +20,7 @@ struct _Buffer
 
 Buffer *Buffer_new(size_t size)
 {
+	DEBUG(("alloc Buffer %d bytes\n", size));
 	Buffer *buffer = Redis_alloc_T(Buffer);
 	buffer->buff_size = size;
 	buffer->buff = Redis_alloc(size);
@@ -85,9 +86,9 @@ int Buffer_set_limit(Buffer *buffer, int limit)
 
 int Buffer_grow(Buffer *buffer)
 {
-	size_t min_remaining = 0.2 * buffer->capacity;
+	size_t min_remaining = 0.2 * buffer->capacity; //TODO no float mult
 	size_t remaining = Buffer_remaining(buffer);
-	printf("min remaingng: %d, rem: %d\n", min_remaining, remaining);
+	DEBUG(("min remaining: %d, rem: %d\n", min_remaining, remaining));
 	if(remaining < min_remaining) {
 		printf("TODO grow buffer\n");
 		abort();//TODO
@@ -98,13 +99,10 @@ int Buffer_grow(Buffer *buffer)
 
 size_t Buffer_send(Buffer *buffer, int fd)
 {
-	printf("Buffer_send fd: %d, position: %d, limit: %d, remaining: %d\n", fd, buffer->position, buffer->limit, Buffer_remaining(buffer));
+	DEBUG(("Buffer_send fd: %d, position: %d, limit: %d, remaining: %d\n", fd, buffer->position, buffer->limit, Buffer_remaining(buffer)));
 	size_t bytes_written = write(fd, buffer->data + buffer->position, Buffer_remaining(buffer));
-	printf("Buffer_send fd: %d, bytes_written: %d\n", fd, bytes_written);
-	if(bytes_written == -1) {
-		printf("Buffer_send error fd: %d err: %d\n", fd, errno);
-	}
-	else {
+	DEBUG(("Buffer_send fd: %d, bytes_written: %d\n", fd, bytes_written));
+	if(bytes_written != -1) {
 		buffer->position += bytes_written;
 	}
 	return bytes_written;
@@ -113,13 +111,10 @@ size_t Buffer_send(Buffer *buffer, int fd)
 size_t Buffer_recv(Buffer *buffer, int fd)
 {
 	Buffer_grow(buffer);
-	printf("Buffer_recv fd: %d, position: %d, limit: %d, remaining: %d\n", fd, buffer->position, buffer->limit, Buffer_remaining(buffer));
+	DEBUG(("Buffer_recv fd: %d, position: %d, limit: %d, remaining: %d\n", fd, buffer->position, buffer->limit, Buffer_remaining(buffer)));
 	size_t bytes_read = read(fd, buffer->data + buffer->position, Buffer_remaining(buffer));
-	printf("Buffer_recv fd: %d, bytes_read: %d\n", fd, bytes_read);
-	if(bytes_read == -1) {
-		printf("Buffer_recv error fd: %d err: %d\n", fd, errno);
-	}
-	else {
+	DEBUG(("Buffer_recv fd: %d, bytes_read: %d\n", fd, bytes_read));
+	if(bytes_read != -1) {
 		buffer->position += bytes_read;
 	}
 	return bytes_read;
@@ -141,7 +136,8 @@ int Buffer_vprintf(Buffer *buffer, const char *format, va_list args)
 		remaining = buffer->limit - buffer->position;
 		written = vsnprintf(buffer->data + buffer->position, remaining, format, args);
 		//TODO check written again
-		printf("assert!");
+		printf("TODO!\n");
+		abort();
 	}
 	buffer->position += written;
 	return 0;

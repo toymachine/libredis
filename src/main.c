@@ -30,6 +30,7 @@ int main(void) {
 	while(Batch_has_result(batch)) {
 		Reply *reply = Batch_next_result(batch);
 		Reply_dump(reply);
+		Reply_free(reply);
 	}
 
 	printf("normal main done!\n");

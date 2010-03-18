@@ -43,7 +43,7 @@ void Connection_event_add(Connection *connection, struct event *event, long int 
 	tv.tv_sec = tv_sec;
 	tv.tv_usec = tv_usec;
 	int res = event_add(event, &tv);
-	printf("connection ev add: fd: %d, type: %c, res: %d\n", connection->sockfd, event == &connection->event_read ? 'R' : 'W', res);
+	DEBUG(("connection ev add: fd: %d, type: %c, res: %d\n", connection->sockfd, event == &connection->event_read ? 'R' : 'W', res));
 }
 
 
@@ -71,7 +71,7 @@ int Connection_buffer_next_command(Connection *connection)
 
 void Connection_write_data(Connection *connection)
 {
-	printf("connection write_data fd: %d\n", connection->sockfd);
+	DEBUG(("connection write_data fd: %d\n", connection->sockfd));
 
 	if(CS_CLOSED == connection->state) {
 		if(-1 == Connection_connect(connection)) {
@@ -79,18 +79,18 @@ void Connection_write_data(Connection *connection)
 			if(EINPROGRESS == errno) {
 				//normal async connect
 				connection->state = CS_CONNECTING;
-				printf("async connecting\n");
+				DEBUG(("async connecting\n"));
 				Connection_event_add(connection, &connection->event_write, 0, 400000);
 				return;
 			}
 			else {
-				printf("abort on connect, errno: %d\n", errno);
+				DEBUG(("abort on connect, errno: %d\n", errno));
 				abort(); //TODO
 			}
 		}
 		else {
 			//immediate connect succeeded
-			printf("sync connected\n");
+			DEBUG(("sync connected\n"));
 			connection->state = CS_CONNECTED;
 		}
 	}
@@ -117,14 +117,14 @@ void Connection_write_data(Connection *connection)
 			while(Buffer_remaining(buffer)) {
 				//still something to write
 				size_t res = Buffer_send(buffer, connection->sockfd);
-				printf("bfr send res: %d\n", res);
+				DEBUG(("bfr send res: %d\n", res));
 				if(res == -1) {
 					if(errno == EAGAIN) {
 						Connection_event_add(connection, &connection->event_write, 0, 400000);
 						return;
 					}
 					else {
-						printf("send error, errno: %d\n", errno);
+						DEBUG(("send error, errno: %d\n", errno));
 						abort();
 					}
 				}
@@ -149,7 +149,7 @@ int Connection_add_commands(Connection *connection, struct list_head *commands)
 
 void Connection_read_data(Connection *connection)
 {
-	printf("connection read fd: %d\n", connection->sockfd);
+	DEBUG(("connection read fd: %d\n", connection->sockfd));
 
 start:
 	while(!list_empty(&connection->read_queue)) {
@@ -161,9 +161,11 @@ start:
 			printf("todo read EAGAIN\n");
 			abort(); //TODO
 		}
+#ifndef NDEBUG
 		Buffer_dump(buffer, 64);
+#endif
 		while(1) {
-			printf("exec rp\n");
+			DEBUG(("exec rp\n"));
 			Reply *reply = NULL;
 			ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(buffer), Buffer_position(buffer), &reply);
 			switch(rp_res) {
@@ -186,15 +188,15 @@ start:
 			}
 		}
 	}
-	printf("connection read queue empty: %d\n", connection->sockfd);
+	DEBUG(("connection read queue empty: %d\n", connection->sockfd));
 }
 
 void Connection_handle_event(int fd, short flags, void *data)
 {
 	Connection *connection = (Connection *)data;
 
-	printf("con event, fd: %d, state: %d, readable: %d, writeable: %d, timeout: %d\n", connection->sockfd,
-			connection->state, (flags & EV_READ) ? 1 : 0, (flags & EV_WRITE) ? 1 : 0, (flags & EV_TIMEOUT) ? 1 : 0 );
+	DEBUG(("con event, fd: %d, state: %d, readable: %d, writeable: %d, timeout: %d\n", connection->sockfd,
+			connection->state, (flags & EV_READ) ? 1 : 0, (flags & EV_WRITE) ? 1 : 0, (flags & EV_TIMEOUT) ? 1 : 0 ));
 
 	if(flags & EV_WRITE) {
 		if(flags & EV_TIMEOUT) {
@@ -218,6 +220,7 @@ void Connection_handle_event(int fd, short flags, void *data)
 
 Connection *Connection_new(const char *addr, int port)
 {
+	DEBUG(("alloc Connection\n"));
 	Connection *connection = Redis_alloc_T(Connection);
 	connection->state = CS_CLOSED;
 
