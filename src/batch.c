@@ -54,6 +54,18 @@ Batch *Batch_new()
 	return batch;
 }
 
+int Batch_free(Batch *batch)
+{
+	assert(list_empty(&batch->write_queue));
+	assert(list_empty(&batch->read_queue));
+	Buffer_free(batch->read_buffer);
+	Buffer_free(batch->write_buffer);
+	DEBUG(("dealloc Batch\n"));
+	Redis_free_T(batch, Batch);
+	return 0;
+}
+
+
 Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len)
 {
 	DEBUG(("alloc Reply\n"));
@@ -167,6 +179,7 @@ int Command_free(Command *command)
 {
 	DEBUG(("dealloc Command\n"));
 	Redis_free_T(command, Command);
+	return 0;
 }
 
 Command *Command_list_last(struct list_head *head)

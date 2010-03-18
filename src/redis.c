@@ -7,6 +7,7 @@
 
 struct _Redis
 {
+	size_t allocated;
 };
 
 static Redis redis_instance;
@@ -18,13 +19,15 @@ Redis *Redis_get_instance()
 
 void *_Redis_alloc(Redis *redis, size_t size)
 {
-	DEBUG(("alloc: %d\n", size));
+	redis->allocated += size;
+	DEBUG(("alloc: %d total now: %d\n", size, redis->allocated));
 	return malloc(size);
 }
 
 void _Redis_free(Redis *redis, void *obj, size_t size)
 {
-	DEBUG(("dealloc: %d\n", size));
+	redis->allocated -= size;
+	DEBUG(("dealloc: %d total left: %d\n", size, redis->allocated));
 	free(obj);
 }
 

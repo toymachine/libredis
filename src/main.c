@@ -9,29 +9,38 @@
 #include "reply.h"
 #include "assert.h"
 
+#define N 2
+
 int main(void) {
 	event_init();
 
 	Connection *connection = Connection_new("127.0.0.1", 6379);
 
-	Batch *batch = Batch_new();
-	Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "blaat", 3, "aap");
-	Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "piet", 7, "jaapaap");
-	Batch_write_command(batch, "GET %s\r\n", "blaat");
-	Batch_write_command(batch, "MGET %s %s %s\r\n", "blaat", "piet", "boe");
-	Batch_write_command(batch, "GET %s\r\n", "blaat2");
+	int i;
+	for(i = 0; i < N; i++) {
+		Batch *batch = Batch_new();
+		Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "blaat", 3, "aap");
+		Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "piet", 7, "jaapaap");
+		Batch_write_command(batch, "GET %s\r\n", "blaat");
+		Batch_write_command(batch, "MGET %s %s %s\r\n", "blaat", "piet", "boe");
+		Batch_write_command(batch, "GET %s\r\n", "blaat2");
 
-	Batch_execute(batch, connection);
+		Batch_execute(batch, connection);
 
-	event_dispatch();
+		event_dispatch();
 
-	printf("after dispatch\n");
+		printf("after dispatch\n");
 
-	while(Batch_has_result(batch)) {
-		Reply *reply = Batch_next_result(batch);
-		Reply_dump(reply);
-		Reply_free(reply);
+		while(Batch_has_result(batch)) {
+			Reply *reply = Batch_next_result(batch);
+			Reply_dump(reply);
+			Reply_free(reply);
+		}
+
+		Batch_free(batch);
 	}
+
+	Connection_free(connection);
 
 	printf("normal main done!\n");
 

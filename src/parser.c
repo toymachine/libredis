@@ -59,6 +59,13 @@ ReplyParser *ReplyParser_new()
 	return rp;
 }
 
+int ReplyParser_free(ReplyParser *rp)
+{
+	DEBUG(("dealloc ReplyParser\n"));
+	Redis_free_T(rp, ReplyParser);
+	return 0;
+}
+
 
 ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len, Reply **reply)
 {    

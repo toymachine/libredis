@@ -34,6 +34,7 @@ void _Redis_free(Redis *redis, void *obj, size_t size);
 
 #define Redis_alloc(SIZE) _Redis_alloc(Redis_get_instance(), SIZE)
 #define Redis_alloc_T(T) (T *)_Redis_alloc(Redis_get_instance(), sizeof(T))
-#define Redis_free_T(PT,T) _Redis_free(Redis_get_instance(), PT, sizeof(T))
+#define Redis_free(P, SIZE) _Redis_free(Redis_get_instance(), P, SIZE)
+#define Redis_free_T(PT, T) _Redis_free(Redis_get_instance(), PT, sizeof(T))
 
 #endif

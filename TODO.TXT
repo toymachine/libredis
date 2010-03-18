@@ -1,0 +1,4 @@
+- alloc/free balance
+- speed check
+- alloc with free list
+- make sure that not each cmd results in 1 write, e.g. bundle many in 1 syscal

@@ -255,3 +255,12 @@ Connection *Connection_new(const char *addr, int port)
 
 	return connection;
 }
+
+int Connection_free(Connection *connection)
+{
+	ReplyParser_free(connection->parser);
+	DEBUG(("dealloc Connection\n"));
+	Redis_free_T(connection, Connection);
+	return 0;
+}
+

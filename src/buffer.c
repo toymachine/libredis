@@ -32,6 +32,15 @@ Buffer *Buffer_new(size_t size)
 	return buffer;
 }
 
+int Buffer_free(Buffer *buffer)
+{
+	Redis_free(buffer->buff, buffer->capacity);
+	DEBUG(("dealloc Buffer\n"));
+	Redis_free_T(buffer, Buffer);
+	return 0;
+}
+
+
 Byte *Buffer_data(Buffer *buffer)
 {
 	return buffer->data;

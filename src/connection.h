@@ -5,6 +5,7 @@
 #include "buffer.h"
 
 Connection *Connection_new(const char *addr, int port);
+int Connection_free(Connection *connection);
 
 #endif
 

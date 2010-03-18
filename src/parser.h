@@ -16,6 +16,8 @@ typedef enum _ReplyParserResult
 } ReplyParserResult;
 
 ReplyParser *ReplyParser_new();
+int ReplyParser_free(ReplyParser *rp);
+
 ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len, Reply **reply);
 
 #endif
