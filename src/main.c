@@ -3,13 +3,12 @@
 #include <stdio.h>
 #include <event.h>
 
-#include "redis.h"
 #include "batch.h"
 #include "parser.h"
 #include "reply.h"
 #include "assert.h"
 
-#define N 2
+#define N 1
 
 int main(void) {
 	event_init();
@@ -21,11 +20,11 @@ int main(void) {
 		DEBUG(("round %d\n", i));
 
 		Batch *batch = Batch_new();
-		Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "blaat", 3, "aap");
-		Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "piet", 7, "jaapaap");
+		//Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "blaat", 3, "aap");
+		//Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "piet", 7, "jaapaap");
 		Batch_write_command(batch, "GET %s\r\n", "blaat");
-		Batch_write_command(batch, "MGET %s %s %s\r\n", "blaat", "piet", "boe");
-		Batch_write_command(batch, "GET %s\r\n", "blaat2");
+		//Batch_write_command(batch, "MGET %s %s %s\r\n", "blaat", "piet", "boe");
+		//Batch_write_command(batch, "GET %s\r\n", "blaat2");
 
 		Connection_execute(connection, batch);
 

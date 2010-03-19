@@ -1,6 +1,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <event.h>
 #include <errno.h>
@@ -42,7 +43,7 @@ void Connection_handle_event(int fd, short flags, void *data);
 Connection *Connection_new(const char *addr, int port)
 {
 	DEBUG(("alloc Connection\n"));
-	Connection *connection = Redis_alloc_T(Connection);
+	Connection *connection = Alloc_alloc_T(Connection);
 	connection->state = CS_CLOSED;
 
 	connection->current_batch = NULL;
@@ -70,6 +71,11 @@ Connection *Connection_new(const char *addr, int port)
 		printf("TODO error on nonblock fcntl\n");
 		abort();
 	}
+	//set nodelay option
+	/*
+	int nodelay = 1;
+	setsockopt(connection->sockfd, SOL_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
+	*/
 
 	return connection;
 }
@@ -78,7 +84,7 @@ int Connection_free(Connection *connection)
 {
 	ReplyParser_free(connection->parser);
 	DEBUG(("dealloc Connection\n"));
-	Redis_free_T(connection, Connection);
+	Alloc_free_T(connection, Connection);
 	return 0;
 }
 
@@ -173,7 +179,7 @@ int Connection_execute(Connection *connection, Batch *batch)
 	ReplyParser_reset(connection->parser);
 	Buffer_flip(Batch_write_buffer(batch));
 
-	DEBUG(("Cnn exec write buff:\n"));
+	DEBUG(("Connection exec write buff:\n"));
 #ifndef NDEBUG
 	Buffer_dump(Batch_write_buffer(batch), 128);
 #endif
@@ -191,9 +197,10 @@ void Connection_read_data(Connection *connection)
 	DEBUG(("connection read data fd: %d\n", connection->sockfd));
 	assert(connection->current_batch != NULL);
 
+	Buffer *buffer = Batch_read_buffer(connection->current_batch);
+	assert(buffer != NULL);
+
 	while(Batch_has_command(connection->current_batch)) {
-		Buffer *buffer = Batch_read_buffer(connection->current_batch);
-		assert(buffer != NULL);
 		DEBUG(("exec rp\n"));
 		Reply *reply = NULL;
 		ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(buffer), Buffer_position(buffer), &reply);

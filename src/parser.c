@@ -37,7 +37,7 @@ int ReplyParser_reset(ReplyParser *rp)
 ReplyParser *ReplyParser_new()
 {
 	DEBUG(("alloc ReplyParser\n"));
-	ReplyParser *rp = Redis_alloc_T(ReplyParser);
+	ReplyParser *rp = Alloc_alloc_T(ReplyParser);
 	ReplyParser_reset(rp);
 	return rp;
 }
@@ -45,7 +45,7 @@ ReplyParser *ReplyParser_new()
 int ReplyParser_free(ReplyParser *rp)
 {
 	DEBUG(("dealloc ReplyParser\n"));
-	Redis_free_T(rp, ReplyParser);
+	Alloc_free_T(rp, ReplyParser);
 	return 0;
 }
 

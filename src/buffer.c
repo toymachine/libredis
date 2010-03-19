@@ -6,6 +6,7 @@
 
 #include "common.h"
 #include "buffer.h"
+#include "list.h"
 
 struct _Buffer
 {
@@ -20,10 +21,9 @@ struct _Buffer
 
 Buffer *Buffer_new(size_t size)
 {
-	DEBUG(("alloc Buffer %d bytes\n", size));
-	Buffer *buffer = Redis_alloc_T(Buffer);
+	Buffer *buffer = Alloc_alloc_T(Buffer);
 	buffer->buff_size = size;
-	buffer->buff = Redis_alloc(size);
+	buffer->buff = Alloc_alloc(size);
 #ifndef NDEBUG
 	int i;
 	for(i = 0; i < size; i++) {
@@ -38,11 +38,18 @@ Buffer *Buffer_new(size_t size)
 	return buffer;
 }
 
+int Buffer_clear(Buffer *buffer)
+{
+	buffer->position = 0;
+	buffer->limit = buffer->capacity;
+	buffer->mark = 0;
+}
+
 int Buffer_free(Buffer *buffer)
 {
-	Redis_free(buffer->buff, buffer->capacity);
+	Alloc_free(buffer->buff, buffer->capacity);
 	DEBUG(("dealloc Buffer\n"));
-	Redis_free_T(buffer, Buffer);
+	Alloc_free_T(buffer, Buffer);
 	return 0;
 }
 

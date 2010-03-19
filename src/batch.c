@@ -9,6 +9,8 @@
 
 struct _Batch
 {
+	struct list_head list; //for creating lists of batches
+
 	struct list_head cmd_queue; //commands queued for writing
 	struct list_head reply_queue; //finished commands that have replies set
 
@@ -19,10 +21,7 @@ struct _Batch
 struct _Command
 {
 	struct list_head list;
-
-	Batch *batch;
 	Reply *reply;
-
 };
 
 struct _Reply
@@ -40,12 +39,19 @@ struct _Reply
 	struct list_head *current;
 };
 
+ALLOC_LIST_T(Batch, list);
+
 Batch *Batch_new()
 {
-	DEBUG(("alloc Batch\n"));
-	Batch *batch = Redis_alloc_T(Batch);
-	batch->read_buffer = Buffer_new(DEFAULT_READ_BUFF_SIZE);
-	batch->write_buffer = Buffer_new(DEFAULT_WRITE_BUFF_SIZE);
+	Batch *batch;
+	if(Batch_alloc(&batch)) {
+		batch->read_buffer = Buffer_new(DEFAULT_READ_BUFF_SIZE);
+		batch->write_buffer = Buffer_new(DEFAULT_WRITE_BUFF_SIZE);
+	}
+	else {
+		Buffer_clear(batch->read_buffer);
+		Buffer_clear(batch->write_buffer);
+	}
 	INIT_LIST_HEAD(&batch->cmd_queue);
 	INIT_LIST_HEAD(&batch->reply_queue);
 	return batch;
@@ -55,18 +61,20 @@ int Batch_free(Batch *batch)
 {
 	assert(list_empty(&batch->cmd_queue));
 	assert(list_empty(&batch->reply_queue));
-	Buffer_free(batch->read_buffer);
-	Buffer_free(batch->write_buffer);
-	DEBUG(("dealloc Batch\n"));
-	Redis_free_T(batch, Batch);
+	//note that we don't free the buffers, because we will re-use them
+	//TODO ungrow buffers here
+	Batch_dealloc(batch);
 	return 0;
 }
 
+//static struct list_head reply_free_list = LIST_HEAD_INIT(reply_free_list);
+ALLOC_LIST_T(Reply, list)
 
 Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len)
 {
-	DEBUG(("alloc Reply\n"));
-	Reply *reply = Redis_alloc_T(Reply);
+	//Alloc_alloc_list_T(Reply, list, reply, &reply_free_list);
+	Reply *reply;
+	Reply_alloc(&reply);
 	reply->type = type;
 	reply->data = data;
 	reply->offset = offset;
@@ -86,8 +94,8 @@ int Reply_free(Reply *reply)
 	if(reply->cmd) {
 		Command_free(reply->cmd);
 	}
-	DEBUG(("dealloc Reply\n"));
-	Redis_free_T(reply, Reply);
+	Reply_dealloc(reply);
+	//Alloc_free_list_T(Reply, list, reply, &reply_free_list);
 	return 0;
 }
 
@@ -165,41 +173,22 @@ int Reply_dump(Reply *reply) {
 	return 0;
 }
 
+ALLOC_LIST_T(Command, list);
+
 Command *Command_new()
 {
-	DEBUG(("alloc Command\n"));
-	Command *command = Redis_alloc_T(Command);
+	Command *command;
+	Command_alloc(&command);
+	command->reply = NULL;
 	return command;
 }
 
 int Command_free(Command *command)
 {
-	DEBUG(("dealloc Command\n"));
-	Redis_free_T(command, Command);
+	Command_dealloc(command);
 	return 0;
 }
 
-Command *Command_list_last(struct list_head *head)
-{
-	struct list_head *pos = list_last(head);
-	return list_entry(pos, Command, list);
-}
-
-Command *Command_list_pop(struct list_head *head)
-{
-	struct list_head *pos = list_pop(head);
-	return list_entry(pos, Command, list);
-}
-
-Reply *Command_reply(Command *cmd)
-{
-	return cmd->reply;
-}
-
-Batch *Command_batch(Command *cmd)
-{
-	return cmd->batch;
-}
 
 int Batch_write_command(Batch *batch, const char *format, ...)
 {
@@ -210,7 +199,6 @@ int Batch_write_command(Batch *batch, const char *format, ...)
 	va_end(args);
 
 	Command *cmd = Command_new();
-	cmd->batch = batch;
 
 	list_add(&(cmd->list), &(batch->cmd_queue));
 
@@ -235,7 +223,7 @@ Command *Batch_next_command(Batch *batch)
 int Batch_add_reply(Batch *batch, Reply *reply)
 {
 	DEBUG(("pop cmd from command queue\n"));
-	Command *cmd = Command_list_pop(&batch->cmd_queue);
+	Command *cmd = list_pop_T(Command, list, &batch->cmd_queue);
 	cmd->reply = reply;
 	reply->cmd = cmd;
 	DEBUG(("add reply/cmd back to reply queue\n"));
