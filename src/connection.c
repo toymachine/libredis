@@ -168,13 +168,9 @@ void Connection_write_data(Connection *connection)
 int Connection_execute(Connection *connection, Batch *batch)
 {
 	DEBUG(("Connection exec\n"));
-	if(connection->current_batch != NULL) {
-		printf(("Connection already executing!!"));
-		abort();
-	}
 
 	connection->current_batch = batch;
-
+	ReplyParser_reset(connection->parser);
 	Buffer_flip(Batch_write_buffer(batch));
 
 	DEBUG(("Cnn exec write buff:\n"));

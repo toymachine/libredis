@@ -9,7 +9,7 @@
 #include "reply.h"
 #include "assert.h"
 
-#define N 1
+#define N 2
 
 int main(void) {
 	event_init();
@@ -37,7 +37,9 @@ int main(void) {
 
 		while(Batch_has_reply(batch)) {
 			Reply *reply = Batch_next_reply(batch);
+#ifndef NDEBUG
 			Reply_dump(reply);
+#endif
 			Reply_free(reply);
 		}
 
@@ -46,7 +48,7 @@ int main(void) {
 
 	Connection_free(connection);
 
-	printf("normal main done!\n");
+	printf("normal main done! %d\n", i);
 
 	return 0;
 }

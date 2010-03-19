@@ -10,7 +10,7 @@ typedef enum _ReplyType
     RT_BULK_NIL = 3,
     RT_BULK = 4,
     RT_MULTIBULK_NIL = 5,
-    RT_MULTIBULK = 6,
+    RT_MULTIBULK = 6
 } ReplyType;
 
 Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len);
