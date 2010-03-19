@@ -12,9 +12,4 @@ Command *Command_list_pop(struct list_head *head);
 Reply *Command_reply(Command *cmd);
 Batch *Command_batch(Command *cmd);
 
-int Command_prepare_buffer(Command *cmd);
-int Command_add_reply(Command *cmd, Reply *reply);
-
-int Connection_add_commands(Connection *connection, struct list_head *commands);
-
 #endif

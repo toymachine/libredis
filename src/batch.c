@@ -9,8 +9,9 @@
 
 struct _Batch
 {
-	struct list_head write_queue; //commands queued for writing
-	struct list_head read_queue; //commands retired after reading
+	struct list_head cmd_queue; //commands queued for writing
+	struct list_head reply_queue; //finished commands that have replies set
+
 	Buffer *write_buffer;
 	Buffer *read_buffer;
 };
@@ -20,10 +21,6 @@ struct _Command
 	struct list_head list;
 
 	Batch *batch;
-
-	size_t offset;
-	size_t len;
-
 	Reply *reply;
 
 };
@@ -49,15 +46,15 @@ Batch *Batch_new()
 	Batch *batch = Redis_alloc_T(Batch);
 	batch->read_buffer = Buffer_new(DEFAULT_READ_BUFF_SIZE);
 	batch->write_buffer = Buffer_new(DEFAULT_WRITE_BUFF_SIZE);
-	INIT_LIST_HEAD(&batch->write_queue);
-	INIT_LIST_HEAD(&batch->read_queue);
+	INIT_LIST_HEAD(&batch->cmd_queue);
+	INIT_LIST_HEAD(&batch->reply_queue);
 	return batch;
 }
 
 int Batch_free(Batch *batch)
 {
-	assert(list_empty(&batch->write_queue));
-	assert(list_empty(&batch->read_queue));
+	assert(list_empty(&batch->cmd_queue));
+	assert(list_empty(&batch->reply_queue));
 	Buffer_free(batch->read_buffer);
 	Buffer_free(batch->write_buffer);
 	DEBUG(("dealloc Batch\n"));
@@ -204,58 +201,58 @@ Batch *Command_batch(Command *cmd)
 	return cmd->batch;
 }
 
-int Command_prepare_buffer(Command *cmd)
-{
-	Buffer *buffer = cmd->batch->write_buffer;
-	Buffer_set_position(buffer, cmd->offset);
-	Buffer_set_limit(buffer, cmd->offset + cmd->len);
-	return 0;
-}
-
-int Command_add_reply(Command *cmd, Reply *reply)
-{
-	cmd->reply = reply;
-	reply->cmd = cmd;
-	DEBUG(("add cmd back to batch, len: %d, off: %d\n", cmd->len, cmd->offset));
-	list_add(&cmd->list, &cmd->batch->read_queue);
-	return 0;
-}
-
 int Batch_write_command(Batch *batch, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
 	size_t offset = Buffer_position(batch->write_buffer);
 	Buffer_vprintf(batch->write_buffer, format, args);
-	size_t len = Buffer_position(batch->write_buffer) - offset;
 	va_end(args);
 
 	Command *cmd = Command_new();
 	cmd->batch = batch;
-	cmd->offset = offset;
-	cmd->len = len;
 
-	list_add(&(cmd->list), &(batch->write_queue));
+	list_add(&(cmd->list), &(batch->cmd_queue));
 
 	return 0;
 }
 
-int Batch_execute(Batch *batch, Connection *connection)
+int Batch_has_command(Batch *batch)
 {
-	DEBUG(("batch execute\n"));
-	Connection_add_commands(connection, &batch->write_queue);
+	return !list_empty(&batch->cmd_queue);
+}
+
+Command *Batch_next_command(Batch *batch)
+{
+	if(Batch_has_command(batch)) {
+		return list_pop_T(Command, list, &batch->cmd_queue);
+	}
+	else {
+		return NULL;
+	}
+}
+
+int Batch_add_reply(Batch *batch, Reply *reply)
+{
+	DEBUG(("pop cmd from command queue\n"));
+	Command *cmd = Command_list_pop(&batch->cmd_queue);
+	cmd->reply = reply;
+	reply->cmd = cmd;
+	DEBUG(("add reply/cmd back to reply queue\n"));
+	list_add(&cmd->list, &batch->reply_queue);
 	return 0;
 }
 
-int Batch_has_result(Batch *batch)
+
+int Batch_has_reply(Batch *batch)
 {
-	return !list_empty(&batch->read_queue);
+	return !list_empty(&batch->reply_queue);
 }
 
-Reply *Batch_next_result(Batch *batch)
+Reply *Batch_next_reply(Batch *batch)
 {
-	if(Batch_has_result(batch)) {
-		Command *cmd = list_pop_T(Command, list, &batch->read_queue);
+	if(Batch_has_reply(batch)) {
+		Command *cmd = list_pop_T(Command, list, &batch->reply_queue);
 		return cmd->reply;
 	}
 	else {

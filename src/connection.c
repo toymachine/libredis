@@ -33,11 +33,8 @@ struct _Connection
 	ConnectionState state;
 	struct event event_read;
 	struct event event_write;
-	struct list_head write_queue; //commands queued for writing
-	struct list_head read_queue; //commands queued for reading
-	Batch *current_read_batch;
+	Batch *current_batch;
 	ReplyParser *parser;
-	Batch *last_batch;
 };
 
 void Connection_handle_event(int fd, short flags, void *data);
@@ -48,11 +45,7 @@ Connection *Connection_new(const char *addr, int port)
 	Connection *connection = Redis_alloc_T(Connection);
 	connection->state = CS_CLOSED;
 
-	//cmd queues
-	INIT_LIST_HEAD(&connection->write_queue);
-	INIT_LIST_HEAD(&connection->read_queue);
-	connection->current_read_batch = NULL;
-
+	connection->current_batch = NULL;
 	connection->parser = ReplyParser_new();
 
 	//socket stuff:
@@ -109,21 +102,10 @@ int Connection_connect(Connection *connection)
 	return connect(connection->sockfd, (struct sockaddr *) &sa, sizeof(struct sockaddr));
 }
 
-int Connection_buffer_next_command(Connection *connection)
-{
-	if(!list_empty(&connection->write_queue)) {
-		Command *cmd = Command_list_last(&connection->write_queue);
-		Command_prepare_buffer(cmd);
-		return 1;
-	}
-	else {
-		return 0;
-	}
-}
-
 void Connection_write_data(Connection *connection)
 {
 	DEBUG(("connection write_data fd: %d\n", connection->sockfd));
+	assert(connection->current_batch != NULL);
 
 	if(CS_CLOSED == connection->state) {
 		if(-1 == Connection_connect(connection)) {
@@ -163,68 +145,66 @@ void Connection_write_data(Connection *connection)
 
 	if(CS_CONNECTED == connection->state) {
 
-		while(!list_empty(&connection->write_queue)) {
-			Command *cmd = Command_list_last(&connection->write_queue);
-			Buffer *buffer = Batch_write_buffer(Command_batch(cmd));
-			while(Buffer_remaining(buffer)) {
-				//still something to write
-				size_t res = Buffer_send(buffer, connection->sockfd);
-				DEBUG(("bfr send res: %d\n", res));
-				if(res == -1) {
-					if(errno == EAGAIN) {
-						Connection_event_add(connection, &connection->event_write, 0, 400000);
-						return;
-					}
-					else {
-						printf("send error, errno: %d\n", errno);
-						abort();
-					}
+		Buffer *buffer = Batch_write_buffer(connection->current_batch);
+		while(Buffer_remaining(buffer)) {
+			//still something to write
+			size_t res = Buffer_send(buffer, connection->sockfd);
+			DEBUG(("bfr send res: %d\n", res));
+			if(res == -1) {
+				if(errno == EAGAIN) {
+					Connection_event_add(connection, &connection->event_write, 0, 400000);
+					return;
+				}
+				else {
+					printf("send error, errno: %d\n", errno);
+					abort();
 				}
 			}
-			//command written
-			struct list_head *pos;
-			pos = list_pop(&connection->write_queue);
-			list_add(pos, &connection->read_queue);
-			Connection_event_add(connection, &connection->event_read, 0, 400000);
-			Connection_buffer_next_command(connection);
 		}
+
 	}
 }
 
-int Connection_add_commands(Connection *connection, struct list_head *commands)
+int Connection_execute(Connection *connection, Batch *batch)
 {
-	list_splice_init(commands, &connection->write_queue);
-	if(Connection_buffer_next_command(connection)) {
-		Connection_write_data(connection);
+	DEBUG(("Connection exec\n"));
+	if(connection->current_batch != NULL) {
+		printf(("Connection already executing!!"));
+		abort();
 	}
+
+	connection->current_batch = batch;
+
+	Buffer_flip(Batch_write_buffer(batch));
+
+	DEBUG(("Cnn exec write buff:\n"));
+#ifndef NDEBUG
+	Buffer_dump(Batch_write_buffer(batch), 128);
+#endif
+
+	//kick off writing:
+	Connection_write_data(connection);
+	//kick off reading:
+	Connection_read_data(connection);
+
 	return 0;
 }
 
 void Connection_read_data(Connection *connection)
 {
 	DEBUG(("connection read data fd: %d\n", connection->sockfd));
-	assert(!list_empty(&connection->read_queue));
+	assert(connection->current_batch != NULL);
 
-	//TODO situation end of batch, or new batch, in that case we need to reset reply parser
-	//and or save any leftovers already received in buf and add it to the buff of the next batch
-
-	while(!list_empty(&connection->read_queue)) {
-		DEBUG(("exec rp\n"));
-		Command *cmd = Command_list_last(&connection->read_queue);
-		Batch *batch = Command_batch(cmd);
-		assert(batch != NULL);
-		Buffer *buffer = Batch_read_buffer(batch);
+	while(Batch_has_command(connection->current_batch)) {
+		Buffer *buffer = Batch_read_buffer(connection->current_batch);
 		assert(buffer != NULL);
+		DEBUG(("exec rp\n"));
 		Reply *reply = NULL;
 		ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(buffer), Buffer_position(buffer), &reply);
 		switch(rp_res) {
 		case RPR_ERROR: {
 			printf("result parse error!");
 			abort();
-		}
-		case RPR_DONE: {
-			assert(!list_empty(&connection->read_queue));
-			//fall trough to more case, e.g. we need more data
 		}
 		case RPR_MORE: {
 			size_t res = Buffer_recv(buffer, connection->sockfd);
@@ -244,8 +224,7 @@ void Connection_read_data(Connection *connection)
 			break;
 		}
 		case RPR_REPLY: {
-			Command_list_pop(&connection->read_queue);
-			Command_add_reply(cmd, reply);
+			Batch_add_reply(connection->current_batch, reply);
 			break;
 		}
 		default:

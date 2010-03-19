@@ -9,7 +9,7 @@
 #include "reply.h"
 #include "assert.h"
 
-#define N 2
+#define N 1
 
 int main(void) {
 	event_init();
@@ -27,7 +27,7 @@ int main(void) {
 		Batch_write_command(batch, "MGET %s %s %s\r\n", "blaat", "piet", "boe");
 		Batch_write_command(batch, "GET %s\r\n", "blaat2");
 
-		Batch_execute(batch, connection);
+		Connection_execute(connection, batch);
 
 		DEBUG(("before dispatch\n"));
 
@@ -35,8 +35,8 @@ int main(void) {
 
 		DEBUG(("after dispatch\n"));
 
-		while(Batch_has_result(batch)) {
-			Reply *reply = Batch_next_result(batch);
+		while(Batch_has_reply(batch)) {
+			Reply *reply = Batch_next_reply(batch);
 			Reply_dump(reply);
 			Reply_free(reply);
 		}

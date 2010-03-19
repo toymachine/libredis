@@ -251,7 +251,7 @@
 <listOptionValue builtIn="false" value="NDEBUG"/>
 </option>
 <option id="gnu.c.compiler.option.warnings.pedantic.389505680" name="Pedantic (-pedantic)" superClass="gnu.c.compiler.option.warnings.pedantic" value="true" valueType="boolean"/>
-<option id="gnu.c.compiler.option.misc.other.808614396" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -std=c99" valueType="string"/>
+<option id="gnu.c.compiler.option.misc.other.808614396" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0" valueType="string"/>
 <inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.2042413195" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 </tool>
 <tool id="cdt.managedbuild.tool.gnu.c.linker.exe.release.699059502" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.release">
