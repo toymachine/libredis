@@ -167,7 +167,6 @@ void Connection_write_data(Connection *connection)
 				}
 			}
 		}
-
 	}
 }
 
@@ -186,8 +185,8 @@ int Connection_execute(Connection *connection, Batch *batch)
 
 	//kick off writing:
 	Connection_write_data(connection);
-	//kick off reading:
-	Connection_read_data(connection);
+	//kick off reading when socket becomes readable
+	Connection_event_add(connection, &connection->event_read, 0, 400000);
 
 	return 0;
 }

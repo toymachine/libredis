@@ -8,21 +8,24 @@
 #include "reply.h"
 #include "assert.h"
 
-#define N 1
+#define N 100000
+#define M 40
 
 int main(void) {
 	event_init();
 
 	Connection *connection = Connection_new("127.0.0.1", 6379);
 
-	int i;
+	int i,j;
 	for(i = 0; i < N; i++) {
 		DEBUG(("round %d\n", i));
 
 		Batch *batch = Batch_new();
 		//Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "blaat", 3, "aap");
 		//Batch_write_command(batch, "%s %s %d\r\n%s\r\n", "SET", "piet", 7, "jaapaap");
-		Batch_write_command(batch, "GET %s\r\n", "blaat");
+		for(j = 0; j < M; j++) {
+			Batch_write_command(batch, "GET %s\r\n", "blaat");
+		}
 		//Batch_write_command(batch, "MGET %s %s %s\r\n", "blaat", "piet", "boe");
 		//Batch_write_command(batch, "GET %s\r\n", "blaat2");
 
@@ -47,7 +50,7 @@ int main(void) {
 
 	Connection_free(connection);
 
-	printf("normal main done! %d\n", i);
+	printf("normal main done! %d\n", N * M);
 
 	return 0;
 }
