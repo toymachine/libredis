@@ -195,6 +195,7 @@ void Connection_read_data(Connection *connection)
 {
 	DEBUG(("connection read data fd: %d\n", connection->sockfd));
 	assert(connection->current_batch != NULL);
+	assert(CS_CONNECTED == connection->state);
 
 	Buffer *buffer = Batch_read_buffer(connection->current_batch);
 	assert(buffer != NULL);

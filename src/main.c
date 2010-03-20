@@ -8,13 +8,14 @@
 #include "reply.h"
 #include "assert.h"
 
-#define N 100000
-#define M 40
+#define N 10
+#define M 1
 
 int main(void) {
 	event_init();
 
 	Connection *connection = Connection_new("127.0.0.1", 6379);
+//  Connection *connection2 = Connection_new("127.0.0.1", 6380);
 
 	int i,j;
 	for(i = 0; i < N; i++) {

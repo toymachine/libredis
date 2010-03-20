@@ -1,9 +1,9 @@
-- speed check
-- alloc with free list
 - buffer grow stuff
 - socket creation errors
 - connection (re) connect and errors
 - connection reply parser error
 - connection read and write timeouts
+- reconnect when server disconnected (auto server disconnect)
 - read and write EOF
 - other read and write errors
+- final free, e.g. also free the freelists

@@ -1,8 +1,24 @@
 #ifndef __ALLOC_H
 #define __ALLOC_H
 
-void *_Alloc_alloc(size_t size);
-void _Alloc_free(void *obj, size_t size);
+#include <stdlib.h>
+#include <stdio.h>
+
+extern size_t allocated;
+
+static inline void *_Alloc_alloc(size_t size)
+{
+	allocated += size;
+	DEBUG(("alloc real: %d total now: %d\n", size, allocated));
+	return malloc(size);
+}
+
+static inline void _Alloc_free(void *obj, size_t size)
+{
+	free(obj);
+	allocated -= size;
+	DEBUG(("dealloc real: %d total now: %d\n", size, allocated));
+}
 
 #define Alloc_alloc_T(T) (T *) _Alloc_alloc(sizeof(T))
 #define Alloc_free_T(PT, T) _Alloc_free(PT, sizeof(T))
@@ -27,7 +43,7 @@ void _Alloc_free(void *obj, size_t size);
 		} \
 	} \
 	\
-	static inline int T ## _dealloc(T *obj) { \
+	static inline void T ## _dealloc(T *obj) { \
 		DEBUG(("list dealloc " #T "\n")); \
 		list_add(&obj->member, &T ## _free_list); \
 	} \

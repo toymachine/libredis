@@ -27,7 +27,7 @@ Buffer *Buffer_new(size_t size)
 #ifndef NDEBUG
 	int i;
 	for(i = 0; i < size; i++) {
-		buffer->buff[i] = 0xEA;
+		buffer->buff[i] = (Byte)0xEA;
 	}
 #endif
 	buffer->data = buffer->buff;
@@ -38,7 +38,7 @@ Buffer *Buffer_new(size_t size)
 	return buffer;
 }
 
-int Buffer_clear(Buffer *buffer)
+void Buffer_clear(Buffer *buffer)
 {
 	buffer->position = 0;
 	buffer->limit = buffer->capacity;
@@ -108,7 +108,7 @@ int Buffer_set_limit(Buffer *buffer, int limit)
 
 int Buffer_grow(Buffer *buffer)
 {
-	size_t min_remaining = 0.2 * buffer->capacity; //TODO no float mult
+	size_t min_remaining = (buffer->capacity * 256) / 2048;
 	size_t remaining = Buffer_remaining(buffer);
 	DEBUG(("min remaining: %d, rem: %d\n", min_remaining, remaining));
 	if(remaining < min_remaining) {
