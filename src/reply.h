@@ -14,7 +14,9 @@ typedef enum _ReplyType
 } ReplyType;
 
 Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len);
-int Reply_free(Reply *reply);
+void Reply_free(Reply *reply);
+void Reply_free_final();
+
 int Reply_add_child(Reply *reply, Reply *child);
 int Reply_next_child(Reply *reply, Reply **child);
 ReplyType Reply_type(Reply *reply);

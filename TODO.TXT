@@ -1,4 +1,5 @@
 - buffer grow stuff
+- executor/helper/ketama hashing
 - socket creation errors
 - connection (re) connect and errors
 - connection reply parser error
@@ -6,4 +7,4 @@
 - reconnect when server disconnected (auto server disconnect)
 - read and write EOF
 - other read and write errors
-- final free, e.g. also free the freelists
+* final free, e.g. also free the freelists

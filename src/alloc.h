@@ -29,7 +29,7 @@ static inline void _Alloc_free(void *obj, size_t size)
 #define ALLOC_LIST_T(T, member) \
 	static struct list_head T ## _free_list = LIST_HEAD_INIT(T ## _free_list); \
 	\
-	static inline int T ## _alloc(T **obj) \
+	static inline int T ## _list_alloc(T **obj) \
 	{ \
 		if(list_empty(&T ## _free_list)) { \
 			DEBUG(("real alloc " #T "\n")); \
@@ -43,9 +43,29 @@ static inline void _Alloc_free(void *obj, size_t size)
 		} \
 	} \
 	\
-	static inline void T ## _dealloc(T *obj) { \
-		DEBUG(("list dealloc " #T "\n")); \
-		list_add(&obj->member, &T ## _free_list); \
+	static inline void T ## _list_free(T *obj, int final) { \
+		if(final) { \
+			DEBUG(("real free " #T "\n")); \
+			Alloc_free_T(obj, T); \
+		} \
+		else { \
+			DEBUG(("list free " #T "\n")); \
+			list_add(&obj->member, &T ## _free_list); \
+		} \
+	} \
+	\
+	void T ## _free(T *obj) \
+	{ \
+		_ ## T ## _free(obj, 0); \
+	} \
+	\
+	void T ## _free_final() \
+	{ \
+		DEBUG((#T " free final\n")); \
+		while(!list_empty(&T ## _free_list)) { \
+			T *obj = list_pop_T(T, member, &T ## _free_list); \
+			_ ## T ## _free(obj, 1); \
+		} \
 	} \
 
 #endif

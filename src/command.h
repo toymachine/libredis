@@ -5,6 +5,7 @@
 #include "list.h"
 
 Command *Command_new();
-int Command_free(Command *command);
+void Command_free(Command *command);
+void Command_free_final();
 
 #endif

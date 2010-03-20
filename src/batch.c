@@ -47,7 +47,7 @@ Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len)
 {
 	//Alloc_alloc_list_T(Reply, list, reply, &reply_free_list);
 	Reply *reply;
-	Reply_alloc(&reply);
+	Reply_list_alloc(&reply);
 	reply->type = type;
 	reply->data = data;
 	reply->offset = offset;
@@ -58,17 +58,18 @@ Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len)
 	return reply;
 }
 
-int Reply_free(Reply *reply)
+void _Reply_free(Reply *reply, int final)
 {
-	while(!list_empty(&reply->children)) {
-		Reply *child = list_pop_T(Reply, list, &reply->children);
-		Reply_free(child);
+	if(!final) {
+		while(!list_empty(&reply->children)) {
+			Reply *child = list_pop_T(Reply, list, &reply->children);
+			Reply_free(child);
+		}
+		if(reply->cmd) {
+			Command_free(reply->cmd);
+		}
 	}
-	if(reply->cmd) {
-		Command_free(reply->cmd);
-	}
-	Reply_dealloc(reply);
-	//Alloc_free_list_T(Reply, list, reply, &reply_free_list);
+	Reply_list_free(reply, final);
 	return 0;
 }
 
@@ -151,14 +152,14 @@ ALLOC_LIST_T(Command, list)
 Command *Command_new()
 {
 	Command *command;
-	Command_alloc(&command);
+	Command_list_alloc(&command);
 	command->reply = NULL;
 	return command;
 }
 
-int Command_free(Command *command)
+void _Command_free(Command *command, int final)
 {
-	Command_dealloc(command);
+	Command_list_free(command, final);
 	return 0;
 }
 
@@ -168,7 +169,7 @@ ALLOC_LIST_T(Batch, list)
 Batch *Batch_new()
 {
 	Batch *batch;
-	if(Batch_alloc(&batch)) {
+	if(Batch_list_alloc(&batch)) {
 		batch->read_buffer = Buffer_new(DEFAULT_READ_BUFF_SIZE);
 		batch->write_buffer = Buffer_new(DEFAULT_WRITE_BUFF_SIZE);
 	}
@@ -181,15 +182,20 @@ Batch *Batch_new()
 	return batch;
 }
 
-int Batch_free(Batch *batch)
+void _Batch_free(Batch *batch, int final)
 {
 	assert(list_empty(&batch->cmd_queue));
 	assert(list_empty(&batch->reply_queue));
 	//note that we don't free the buffers, because we will re-use them
 	//TODO ungrow buffers here
-	Batch_dealloc(batch);
+	if(final) {
+		Buffer_free(batch->read_buffer);
+		Buffer_free(batch->write_buffer);
+	}
+	Batch_list_free(batch, final);
 	return 0;
 }
+
 
 int Batch_write_command(Batch *batch, const char *format, ...)
 {

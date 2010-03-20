@@ -6,7 +6,8 @@
 #include "command.h"
 
 Batch *Batch_new();
-int Batch_free(Batch *batch);
+void Batch_free(Batch *batch);
+void Batch_free_final();
 
 int Batch_write_command(Batch *batch, const char *format, ...);
 int Batch_has_command(Batch *batch);
