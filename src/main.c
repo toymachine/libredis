@@ -8,6 +8,7 @@
 #include "connection.h"
 #include "reply.h"
 #include "assert.h"
+#include "ketama.h"
 
 #ifdef NDEBUG
 	#define N 10000
@@ -44,9 +45,8 @@ void read_replies_and_free_batch(Batch *batch)
 	Batch_free(batch);
 }
 
-int main(void) {
-	event_init();
-
+void test_simple()
+{
 	Connection *connection = Connection_new("127.0.0.1", 6379);
     Connection *connection2 = Connection_new("127.0.0.1", 6380);
 
@@ -72,6 +72,30 @@ int main(void) {
 
 	Connection_free(connection);
 	Connection_free(connection2);
+}
+
+void test_ketama()
+{
+	Ketama *ketama = Ketama_new();
+
+	Ketama_add_server(ketama, "10.0.1.1", 11211, 600);
+	Ketama_add_server(ketama, "10.0.1.2", 11211, 300);
+	Ketama_add_server(ketama, "10.0.1.3", 11211, 200);
+	Ketama_add_server(ketama, "10.0.1.4", 11211, 350);
+	Ketama_add_server(ketama, "10.0.1.5", 11211, 1000);
+	Ketama_add_server(ketama, "10.0.1.6", 11211, 800);
+	Ketama_add_server(ketama, "10.0.1.7", 11211, 950);
+	Ketama_add_server(ketama, "10.0.1.8", 11211, 100);
+
+	Ketama_create_continuum(ketama);
+
+	Ketama_free(ketama);
+}
+
+int main(void) {
+	event_init();
+
+	test_ketama();
 
 	//release the freelists
 	Reply_free_final();

@@ -29,13 +29,68 @@
 #include "ketama.h"
 #include "md5.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>           /* floor & floorf                       */
+#include <string.h>
 
+#include "common.h"
+#include "list.h"
+
+typedef struct
+{
+    unsigned int point;  // point on circle
+    char ip[22];
+} mcs;
+
+typedef struct
+{
+	struct list_head list;
+
+    char addr[22];
+    unsigned long memory;
+} serverinfo;
+
+struct _Ketama
+{
+    int numpoints;
+    unsigned int numservers;
+    unsigned long memory;
+    mcs* continuum; //array of mcs structs
+    struct list_head servers;
+};
+
+typedef int (*compfn)( const void*, const void* );
 int ketama_compare( mcs *a, mcs *b );
 
+
+Ketama *Ketama_new()
+{
+	Ketama *ketama = Alloc_alloc_T(Ketama);
+	ketama->numpoints = 0;
+	ketama->numservers = 0;
+	ketama->memory = 0;
+	ketama->continuum = NULL;
+	INIT_LIST_HEAD(&ketama->servers);
+	return ketama;
+}
+
+void Ketama_free(Ketama *ketama)
+{
+	Alloc_free_T(ketama, Ketama);
+}
+
+void Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long weight)
+{
+	serverinfo *info = Alloc_alloc_T(serverinfo);
+	sprintf(info->addr, "%s:%d", addr, port);
+	info->memory = weight;
+	list_add(&info->list, &ketama->servers);
+	ketama->numservers += 1;
+	ketama->memory += weight;
+}
 
 /** \brief Hashing function, converting a string to an unsigned int by using MD5.
   * \param inString The string that you want to hash.
@@ -48,8 +103,7 @@ int ketama_compare( mcs *a, mcs *b );
 //void ketama_md5_digest( char* inString, size_t inLen, unsigned char md5pword[16] );
 
 /* ketama.h does not expose this function */
-void
-ketama_md5_digest( char* inString, size_t inLen, unsigned char md5pword[16] )
+void ketama_md5_digest( char* inString, size_t inLen, unsigned char md5pword[16] )
 {
     md5_state_t md5state;
 
@@ -71,12 +125,11 @@ ketama_hashi( char* inString, size_t inLen )
 }
 
 
-mcs*
-ketama_get_server( char* key, size_t keyLen, ketama_continuum cont )
+int Ketama_get_server(Ketama *ketama, char* key, size_t key_len)
 {
-    unsigned int h = ketama_hashi( key, keyLen );
-    int highp = cont->numpoints;
-    mcs (*mcsarr)[cont->numpoints] = cont->array;
+    unsigned int h = ketama_hashi( key, key_len );
+    int highp = ketama->numpoints;
+    mcs (*mcsarr)[ketama->numpoints] = ketama->continuum;
     int lowp = 0, midp;
     unsigned int midval, midval1;
 
@@ -86,7 +139,7 @@ ketama_get_server( char* key, size_t keyLen, ketama_continuum cont )
     {
         midp = (int)( ( lowp+highp ) / 2 );
 
-        if ( midp == cont->numpoints )
+        if ( midp == ketama->numpoints )
             return &( (*mcsarr)[0] ); // if at the end, roll back to zeroth
 
         midval = (*mcsarr)[midp].point;
@@ -110,45 +163,25 @@ ketama_get_server( char* key, size_t keyLen, ketama_continuum cont )
   * \param key Shared memory key for storing the newly created continuum.
   * \param filename Server definition file, which will be parsed to create this continuum.
   * \return 0 on failure, 1 on success. */
-static int
-ketama_create_continuum()
+void Ketama_create_continuum(Ketama *ketama)
 {
-    int shmid;
-    unsigned int numservers = 0;
-    unsigned long memory;
-    serverinfo* slist;
+	assert(ketama->numservers > 0);
 
-    //slist = read_server_definitions( filename, &numservers, &memory );
-    // Check numservers first; if it is zero then there is no error message
-    // and we need to set one.
-    if ( numservers < 1 )
-    {
-        //sprintf( k_error, "No valid server definitions in file %s", filename );
-        return 0;
-    }
-    else if ( slist == 0 )
-    {
-        /* read_server_definitions must've set error message. */
-        return 0;
-    }
-#ifdef DEBUG
-     syslog( LOG_INFO, "Server definitions read: %u servers, total memory: %lu.\n",
-        numservers, memory );
-#endif
+	DEBUG(("Server definitions read: %u servers, total memory: %lu.\n", ketama->numservers, ketama->memory ));
 
     /* Continuum will hold one mcs for each point on the circle: */
-    mcs continuum[ numservers * 160 ];
-    unsigned int i, k, cont = 0;
+    assert(ketama->continuum == NULL);
+    ketama->continuum = Alloc_alloc(ketama->numservers * sizeof(mcs));
+    unsigned int i = 0, k, cont = 0;
 
-    for( i = 0; i < numservers; i++ )
+    serverinfo *sinfo;
+    list_for_each_entry(sinfo, &ketama->servers, list)
     {
-        float pct = (float)slist[i].memory / (float)memory;
-        unsigned int ks = floorf( pct * 40.0 * (float)numservers );
-#ifdef DEBUG
+        float pct = (float)sinfo->memory / (float)ketama->memory;
+        unsigned int ks = floorf( pct * 40.0 * (float)ketama->numservers );
+#ifndef NDEBUG
         int hpct = floorf( pct * 100.0 );
-
-        syslog( LOG_INFO, "Server no. %d: %s (mem: %lu = %u%% or %d of %d)\n",
-            i, slist[i].addr, slist[i].memory, hpct, ks, numservers * 40 );
+        DEBUG(("Server no. %d: %s (mem: %lu = %u%% or %d of %d)\n", i, sinfo->addr, sinfo->memory, hpct, ks, ketama->numservers * 40 ));
 #endif
 
         for( k = 0; k < ks; k++ )
@@ -157,7 +190,7 @@ ketama_create_continuum()
             char ss[30];
             unsigned char digest[16];
 
-            int len = sprintf( ss, "%s-%d", slist[i].addr, k );
+            int len = sprintf( ss, "%s-%d", sinfo->addr, k );
             ketama_md5_digest( ss, len, digest );
 
             /* Use successive 4-bytes from hash as numbers 
@@ -165,64 +198,27 @@ ketama_create_continuum()
             int h;
             for( h = 0; h < 4; h++ )
             {
-                continuum[cont].point = ( digest[3+h*4] << 24 )
+                ketama->continuum[cont].point = ( digest[3+h*4] << 24 )
                                       | ( digest[2+h*4] << 16 )
                                       | ( digest[1+h*4] <<  8 )
                                       |   digest[h*4];
 
-                memcpy( continuum[cont].ip, slist[i].addr, 22 );
+                memcpy( ketama->continuum[cont].ip, sinfo->addr, 22 );
                 cont++;
             }
         }
+        i++;
     }
-    free( slist );
+
+
+    //free( slist );
 
     /* Sorts in ascending order of "point" */
-    qsort( (void*) &continuum, cont, sizeof( mcs ), (compfn)ketama_compare );
+    //qsort( (void*) &ketama->continuum, cont, sizeof( mcs ), (compfn)ketama_compare );
 
-    /* Add data to shmmem */
-
-    /*
-    shmid = shmget( key, MC_SHMSIZE, 0644 | IPC_CREAT );
-    data = shmat( shmid, (void *)0, 0 );
-    if ( data == (void *)(-1) )
-    {
-        strcpy( k_error, "Can't open shmmem for writing." );
-        return 0;
-    }
-
-    time_t modtime = file_modtime( filename );
-    int nump = cont;
-    memcpy( data, &nump, sizeof( int ) );
-    memcpy( data + 1, &modtime, sizeof( time_t ) );
-    memcpy( data + 1 + sizeof( void* ), &continuum, sizeof( mcs ) * nump );
-	*/
-
-    /* We detatch here because we will re-attach in read-only
-     * mode to actually use it. */
-
-    /*
-#ifdef SOLARIS
-    if ( shmdt( (char *) data ) == -1 )
-#else
-    if ( shmdt( data ) == -1 )
-#endif
-        strcpy( k_error, "Error detatching from shared memory!" );
-	*/
-
-    return 1;
 }
 
-
-
-
-void
-ketama_smoke( ketama_continuum contptr )
-{
-    free( contptr );
-}
-
-
+/*
 void
 ketama_print_continuum( ketama_continuum cont )
 {
@@ -242,7 +238,7 @@ ketama_print_continuum( ketama_continuum cont )
         }
     }
 }
-
+*/
 
 int ketama_compare( mcs *a, mcs *b )
 {

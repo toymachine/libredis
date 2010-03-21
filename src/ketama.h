@@ -26,56 +26,31 @@
 * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifdef __cplusplus /* If this is a C++ compiler, use C linkage */
-extern "C" {
-#endif
+#ifndef __KETAMA_H
+#define __KETAMA_H
 
 #include <string.h>
 
-typedef int (*compfn)( const void*, const void* );
+#include "list.h"
 
-typedef struct
-{
-    unsigned int point;  // point on circle
-    char ip[22];
-} mcs;
+typedef struct _Ketama Ketama;
 
-typedef struct
-{
-    char addr[22];
-    unsigned long memory;
-} serverinfo;
+Ketama *Ketama_new();
+void Ketama_free(Ketama *ketama);
 
-typedef struct
-{
-    int numpoints;
-    void* array; //array of mcs structs
-} continuum;
+void Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long weight);
+void Ketama_create_continuum(Ketama *ketama);
 
-typedef continuum* ketama_continuum;
-
-/** \brief Frees any allocated memory.
-  * \param contptr The continuum that you want to be destroy. */
-void ketama_smoke( ketama_continuum contptr );
 
 /** \brief Maps a key onto a server in the continuum.
   * \param key The key that you want to map to a specific server.
   * \param cont Pointer to the continuum in which we will search.
   * \return The mcs struct that the given key maps to. */
-mcs* ketama_get_server( char* key, size_t keyLen, ketama_continuum );
+int Ketama_get_server(Ketama *ketama, char* key, size_t key_len);
 
 /** \brief Print the server list of a continuum to stdout.
   * \param cont The continuum to print. */
-void ketama_print_continuum( ketama_continuum c );
+//void ketama_print_continuum( ketama_continuum c );
 
-/** \brief Compare two server entries in the circle.
-  * \param a The first entry.
-  * \param b The second entry.
-  * \return -1 if b greater a, +1 if a greater b or 0 if both are equal. */
-//int ketama_compare( mcs*, mcs* );
-
-
-#ifdef __cplusplus /* If this is a C++ compiler, end C linkage */
-}
 #endif
 
