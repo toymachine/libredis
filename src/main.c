@@ -1,10 +1,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <event.h>
 
+#include "event.h"
 #include "batch.h"
 #include "parser.h"
+#include "connection.h"
 #include "reply.h"
 #include "assert.h"
 

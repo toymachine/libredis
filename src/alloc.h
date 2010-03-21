@@ -54,6 +54,8 @@ static inline void _Alloc_free(void *obj, size_t size)
 		} \
 	} \
 	\
+	void _ ## T ## _free(T *obj, int final); \
+	\
 	void T ## _free(T *obj) \
 	{ \
 		_ ## T ## _free(obj, 0); \

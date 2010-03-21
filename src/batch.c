@@ -39,13 +39,10 @@ struct _Reply
 	struct list_head *current;
 };
 
-
-//static struct list_head reply_free_list = LIST_HEAD_INIT(reply_free_list);
 ALLOC_LIST_T(Reply, list)
 
 Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len)
 {
-	//Alloc_alloc_list_T(Reply, list, reply, &reply_free_list);
 	Reply *reply;
 	Reply_list_alloc(&reply);
 	reply->type = type;
@@ -70,7 +67,6 @@ void _Reply_free(Reply *reply, int final)
 		}
 	}
 	Reply_list_free(reply, final);
-	return 0;
 }
 
 int Reply_add_child(Reply *reply, Reply *child)
@@ -160,9 +156,7 @@ Command *Command_new()
 void _Command_free(Command *command, int final)
 {
 	Command_list_free(command, final);
-	return 0;
 }
-
 
 ALLOC_LIST_T(Batch, list)
 
@@ -186,18 +180,23 @@ void _Batch_free(Batch *batch, int final)
 {
 	assert(list_empty(&batch->cmd_queue));
 	assert(list_empty(&batch->reply_queue));
-	//note that we don't free the buffers, because we will re-use them
-	//TODO ungrow buffers here
 	if(final) {
 		Buffer_free(batch->read_buffer);
 		Buffer_free(batch->write_buffer);
 	}
+	else {
+		//note that we don't free the buffers, because we will re-use them
+		//TODO ungrow buffers here when not final
+#ifndef NDEBUG
+		Buffer_fill(batch->read_buffer, (Byte)0xEA);
+		Buffer_fill(batch->write_buffer, (Byte)0xEA);
+#endif
+	}
 	Batch_list_free(batch, final);
-	return 0;
 }
 
 
-int Batch_write_command(Batch *batch, const char *format, ...)
+void Batch_write_command(Batch *batch, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
@@ -207,8 +206,6 @@ int Batch_write_command(Batch *batch, const char *format, ...)
 	Command *cmd = Command_new();
 
 	list_add(&(cmd->list), &(batch->cmd_queue));
-
-	return 0;
 }
 
 int Batch_has_command(Batch *batch)
@@ -226,7 +223,7 @@ Command *Batch_next_command(Batch *batch)
 	}
 }
 
-int Batch_add_reply(Batch *batch, Reply *reply)
+void Batch_add_reply(Batch *batch, Reply *reply)
 {
 	DEBUG(("pop cmd from command queue\n"));
 	Command *cmd = list_pop_T(Command, list, &batch->cmd_queue);
@@ -234,7 +231,6 @@ int Batch_add_reply(Batch *batch, Reply *reply)
 	reply->cmd = cmd;
 	DEBUG(("add reply/cmd back to reply queue\n"));
 	list_add(&cmd->list, &batch->reply_queue);
-	return 0;
 }
 
 

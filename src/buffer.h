@@ -13,6 +13,7 @@ Byte *Buffer_data(Buffer *buffer);
 int Buffer_dump(Buffer *buffer, int limit);
 int Buffer_flip(Buffer *buffer);
 void Buffer_clear(Buffer *buffer);
+void Buffer_fill(Buffer *buffer, Byte b);
 size_t Buffer_position(Buffer *buffer);
 int Buffer_set_position(Buffer *buffer, size_t position);
 int Buffer_set_limit(Buffer *buffer, int limit);

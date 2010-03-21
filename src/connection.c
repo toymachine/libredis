@@ -1,15 +1,15 @@
-#include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
-#include <event.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 
+#include "event.h"
 #include "common.h"
 #include "buffer.h"
 #include "connection.h"
@@ -80,12 +80,11 @@ Connection *Connection_new(const char *addr, int port)
 	return connection;
 }
 
-int Connection_free(Connection *connection)
+void Connection_free(Connection *connection)
 {
 	ReplyParser_free(connection->parser);
 	DEBUG(("dealloc Connection\n"));
 	Alloc_free_T(connection, Connection);
-	return 0;
 }
 
 void Connection_event_add(Connection *connection, struct event *event, long int tv_sec, long int tv_usec)

@@ -24,18 +24,23 @@ Buffer *Buffer_new(size_t size)
 	Buffer *buffer = Alloc_alloc_T(Buffer);
 	buffer->buff_size = size;
 	buffer->buff = Alloc_alloc(size);
-#ifndef NDEBUG
-	int i;
-	for(i = 0; i < size; i++) {
-		buffer->buff[i] = (Byte)0xEA;
-	}
-#endif
 	buffer->data = buffer->buff;
 	buffer->position = 0;
 	buffer->capacity = size;
 	buffer->limit = buffer->capacity;
 	buffer->mark = 0;
+#ifndef NDEBUG
+	Buffer_fill(buffer, (Byte)0xEA);
+#endif
 	return buffer;
+}
+
+void Buffer_fill(Buffer *buffer, Byte b)
+{
+	int i;
+	for(i = 0; i < buffer->capacity; i++) {
+		buffer->buff[i] = b;
+	}
 }
 
 void Buffer_clear(Buffer *buffer)

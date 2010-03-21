@@ -330,7 +330,6 @@ ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len,
     assert(rp->p == len);
     assert(len > 0 ? (rp->cs != 0) : 1);
     assert(rp->cs == 0 ? len == 0 : 1);
-    //return rp->cs == 0 ? RPR_DONE : RPR_MORE;
     return RPR_MORE;
 }
 
