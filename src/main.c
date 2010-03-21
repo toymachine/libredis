@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "common.h"
 #include "event.h"
 #include "batch.h"
 #include "parser.h"
@@ -102,7 +103,7 @@ int main(void) {
 	Command_free_final();
 	Batch_free_final();
 
-	printf("normal main done! %d\n", N * M * 2);
+	printf("normal main done! allocated: %d\n", allocated);
 
 	return 0;
 }

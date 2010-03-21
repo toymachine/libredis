@@ -79,6 +79,13 @@ Ketama *Ketama_new()
 
 void Ketama_free(Ketama *ketama)
 {
+	if(ketama->continuum != NULL) {
+		Alloc_free(ketama->continuum, ketama->numservers * sizeof(mcs) * 160);
+	}
+	while(!list_empty(&ketama->servers)) {
+		serverinfo *sinfo = list_pop_T(serverinfo, list, &ketama->servers);
+		Alloc_free_T(sinfo, serverinfo);
+	}
 	Alloc_free_T(ketama, Ketama);
 }
 
@@ -171,7 +178,7 @@ void Ketama_create_continuum(Ketama *ketama)
 
     /* Continuum will hold one mcs for each point on the circle: */
     assert(ketama->continuum == NULL);
-    ketama->continuum = Alloc_alloc(ketama->numservers * sizeof(mcs));
+    ketama->continuum = Alloc_alloc(ketama->numservers * sizeof(mcs) * 160);
     unsigned int i = 0, k, cont = 0;
 
     serverinfo *sinfo;
@@ -210,11 +217,11 @@ void Ketama_create_continuum(Ketama *ketama)
         i++;
     }
 
-
+    DEBUG(("cont: %d\n", cont));
     //free( slist );
 
     /* Sorts in ascending order of "point" */
-    //qsort( (void*) &ketama->continuum, cont, sizeof( mcs ), (compfn)ketama_compare );
+    qsort( (void*) ketama->continuum, cont, sizeof( mcs ), (compfn)ketama_compare );
 
 }
 
