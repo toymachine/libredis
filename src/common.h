@@ -22,10 +22,18 @@ typedef char Byte;
 
 #include "alloc.h"
 
+typedef char * (*hashmethodfunc)(void *instance, char *key, size_t key_len);
+
+typedef struct _HashMethodDelegate
+{
+	void *instance;
+	hashmethodfunc func;
+} HashMethodDelegate;
+
 typedef struct _Batch Batch;
 typedef struct _Command Command;
 typedef struct _Connection Connection;
 typedef struct _Reply Reply;
-
+typedef struct _Executor Executor;
 
 #endif

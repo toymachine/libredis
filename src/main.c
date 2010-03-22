@@ -10,6 +10,8 @@
 #include "reply.h"
 #include "assert.h"
 #include "ketama.h"
+#include "executor.h"
+#include "module.h"
 
 #ifdef NDEBUG
 	#define N 10000
@@ -75,6 +77,45 @@ void test_simple()
 	Connection_free(connection2);
 }
 
+/*
+void test_executor()
+{
+	Ketama *ketama = Ketama_new();
+	Ketama_add_server(ketama, "10.0.1.1", 11211, 600);
+	Ketama_add_server(ketama, "10.0.1.2", 11211, 600);
+
+	Executor *executor = Executor_new();
+
+	Executor_set_server_hash_method(executor, Ketama_get_hash_method(ketama));
+
+	Executor_start_command(executor, "MGET ");
+
+	int ord = 0;
+	Executor_write(executor, ord++, "blaat1", 6, "%s ", "blaat1");
+	Executor_write(executor, ord++, "blaat2", 6, "%s ", "blaat1");
+	Executor_write(executor, ord++, "blaat3", 6, "%s ", "blaat1");
+	Executor_write(executor, ord++, "blaat4", 6, "%s ", "blaat1");
+
+	Executor_end_command(executor, "\r\n");
+
+	//Executor_write_command(executor, ord++, "blaat1", 6, "GET %s\r\n", "blaat1");
+	//Executor_write_command(executor, ord++, "blaat2", 6, "GET %s\r\n", "blaat2");
+	//Executor_write_command(executor, ord++, "blaat3", 6, "GET %s\r\n", "blaat3");
+
+	Executor_execute(executor);
+	while(Executor_has_reply(executor)) {
+		Reply *reply = Executor_next_reply(executor);
+#ifndef NDEBUG
+		Reply_dump(reply);
+#endif
+		Reply_free(reply);
+	}
+
+	Executor_free(executor);
+	Ketama_free(ketama);
+}
+*/
+
 void test_ketama()
 {
 	Ketama *ketama = Ketama_new();
@@ -105,14 +146,12 @@ void test_ketama()
 }
 
 int main(void) {
-	event_init();
+	Module_init();
 
 	test_ketama();
+	//test_executor();
 
-	//release the freelists
-	Reply_free_final();
-	Command_free_final();
-	Batch_free_final();
+	Module_free();
 
 	printf("normal main done! allocated: %d\n", allocated);
 

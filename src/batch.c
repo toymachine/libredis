@@ -6,6 +6,7 @@
 #include "list.h"
 #include "command.h"
 #include "reply.h"
+#include "connection.h"
 
 struct _Batch
 {
@@ -258,6 +259,19 @@ Buffer *Batch_read_buffer(Batch *batch)
 Buffer *Batch_write_buffer(Batch *batch)
 {
 	return batch->write_buffer;
+}
+
+#include "event.h"
+
+int Batch_execute(Batch *batch, Connection *connection)
+{
+	Connection_execute(connection, batch);
+
+	DEBUG(("before ev disp\n"));
+	event_dispatch();
+	DEBUG(("after ev disp\n"));
+
+	return 0;
 }
 
 

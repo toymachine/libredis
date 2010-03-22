@@ -169,6 +169,14 @@ char *Ketama_get_server(Ketama *ketama, char* key, size_t key_len)
     }
 }
 
+HashMethodDelegate Ketama_get_hash_method(Ketama *ketama)
+{
+	HashMethodDelegate delegate;
+	delegate.instance = ketama;
+	delegate.func = (hashmethodfunc)Ketama_get_server;
+	return delegate;
+}
+
 
 /** \brief Generates the continuum of servers (each server as many points on a circle).
   * \param key Shared memory key for storing the newly created continuum.

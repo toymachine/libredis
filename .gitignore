@@ -1,0 +1,7 @@
+*.pyc
+*~
+Debug
+Release
+Profiling
+.settings
+

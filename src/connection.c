@@ -118,8 +118,9 @@ void Connection_write_data(Connection *connection)
 			if(EINPROGRESS == errno) {
 				//normal async connect
 				connection->state = CS_CONNECTING;
-				DEBUG(("async connecting\n"));
+				DEBUG(("async connecting, adding write event\n"));
 				Connection_event_add(connection, &connection->event_write, 0, 400000);
+				DEBUG(("write event added, now returning\n"));
 				return;
 			}
 			else {

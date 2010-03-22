@@ -15,6 +15,8 @@ void Batch_write_command(Batch *batch, const char *format, ...);
 int Batch_has_command(Batch *batch);
 Command *Batch_next_command(Batch *batch);
 
+int Batch_execute(Batch *batch, Connection *connection);
+
 //replies
 void Batch_add_reply(Batch *batch, Reply *reply);
 int Batch_has_reply(Batch *batch);
