@@ -63,7 +63,7 @@ struct _Ketama
 };
 
 typedef int (*compfn)( const void*, const void* );
-int ketama_compare( mcs *a, mcs *b );
+int Ketama_compare( mcs *a, mcs *b );
 
 
 Ketama *Ketama_new()
@@ -110,7 +110,7 @@ void Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long
 //void ketama_md5_digest( char* inString, size_t inLen, unsigned char md5pword[16] );
 
 /* ketama.h does not expose this function */
-void ketama_md5_digest( char* inString, size_t inLen, unsigned char md5pword[16] )
+void Ketama_md5_digest( char* inString, size_t inLen, unsigned char md5pword[16] )
 {
     md5_state_t md5state;
 
@@ -119,12 +119,11 @@ void ketama_md5_digest( char* inString, size_t inLen, unsigned char md5pword[16]
     md5_finish( &md5state, md5pword );
 }
 
-unsigned int
-ketama_hashi( char* inString, size_t inLen )
+unsigned int Ketama_hashi( char* inString, size_t inLen )
 {
     unsigned char digest[16];
 
-    ketama_md5_digest( inString, inLen, digest );
+    Ketama_md5_digest( inString, inLen, digest );
     return (unsigned int)(( digest[3] << 24 )
                         | ( digest[2] << 16 )
                         | ( digest[1] <<  8 )
@@ -132,11 +131,11 @@ ketama_hashi( char* inString, size_t inLen )
 }
 
 
-int Ketama_get_server(Ketama *ketama, char* key, size_t key_len)
+char *Ketama_get_server(Ketama *ketama, char* key, size_t key_len)
 {
-    unsigned int h = ketama_hashi( key, key_len );
+    unsigned int h = Ketama_hashi( key, key_len );
     int highp = ketama->numpoints;
-    mcs (*mcsarr)[ketama->numpoints] = ketama->continuum;
+    mcs *mcsarr = ketama->continuum;
     int lowp = 0, midp;
     unsigned int midval, midval1;
 
@@ -146,22 +145,27 @@ int Ketama_get_server(Ketama *ketama, char* key, size_t key_len)
     {
         midp = (int)( ( lowp+highp ) / 2 );
 
-        if ( midp == ketama->numpoints )
-            return &( (*mcsarr)[0] ); // if at the end, roll back to zeroth
+        if ( midp == ketama->numpoints ) {
+            return mcsarr[0].ip; // if at the end, roll back to zeroth
+        }
 
-        midval = (*mcsarr)[midp].point;
-        midval1 = midp == 0 ? 0 : (*mcsarr)[midp-1].point;
+        midval = mcsarr[midp].point;
+        midval1 = midp == 0 ? 0 : mcsarr[midp-1].point;
 
-        if ( h <= midval && h > midval1 )
-            return &( (*mcsarr)[midp] );
+        if ( h <= midval && h > midval1 ) {
+            return mcsarr[midp].ip;
+        }
 
-        if ( midval < h )
+        if ( midval < h ) {
             lowp = midp + 1;
-        else
+        }
+        else {
             highp = midp - 1;
+        }
 
-        if ( lowp > highp )
-            return &( (*mcsarr)[0] );
+        if ( lowp > highp ) {
+            return mcsarr[0].ip;
+        }
     }
 }
 
@@ -198,7 +202,7 @@ void Ketama_create_continuum(Ketama *ketama)
             unsigned char digest[16];
 
             int len = sprintf( ss, "%s-%d", sinfo->addr, k );
-            ketama_md5_digest( ss, len, digest );
+            Ketama_md5_digest( ss, len, digest );
 
             /* Use successive 4-bytes from hash as numbers 
              * for the points on the circle: */
@@ -218,36 +222,33 @@ void Ketama_create_continuum(Ketama *ketama)
     }
 
     DEBUG(("cont: %d\n", cont));
+    ketama->numpoints = cont;
     //free( slist );
 
     /* Sorts in ascending order of "point" */
-    qsort( (void*) ketama->continuum, cont, sizeof( mcs ), (compfn)ketama_compare );
+    qsort( (void*) ketama->continuum, cont, sizeof( mcs ), (compfn)Ketama_compare );
 
 }
 
-/*
-void
-ketama_print_continuum( ketama_continuum cont )
+void Ketama_print_continuum( Ketama *ketama )
 {
     int a;
-    printf( "Numpoints in continuum: %d\n", cont->numpoints );
+    printf( "Numpoints in continuum: %d\n", ketama->numpoints );
 
-    if ( cont->array == 0 )
+    if ( ketama->continuum == NULL )
     {
         printf( "Continuum empty\n" );
     }
     else
     {
-        mcs (*mcsarr)[cont->numpoints] = cont->array;
-        for( a = 0; a < cont->numpoints; a++ )
+        for( a = 0; a < ketama->numpoints; a++ )
         {
-            printf( "%s (%u)\n", (*mcsarr)[a].ip, (*mcsarr)[a].point );
+            printf( "%s (%u)\n", ketama->continuum[a].ip, ketama->continuum[a].point );
         }
     }
 }
-*/
 
-int ketama_compare( mcs *a, mcs *b )
+int Ketama_compare( mcs *a, mcs *b )
 {
     return ( a->point < b->point ) ?  -1 : ( ( a->point > b->point ) ? 1 : 0 );
 }

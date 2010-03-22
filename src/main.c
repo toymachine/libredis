@@ -90,6 +90,17 @@ void test_ketama()
 
 	Ketama_create_continuum(ketama);
 
+#ifndef NDEBUG
+	Ketama_print_continuum(ketama);
+#endif
+
+	assert(0 == strcmp("10.0.1.7:11211", Ketama_get_server(ketama, "12936", 5)));
+	assert(0 == strcmp("10.0.1.5:11211", Ketama_get_server(ketama, "27804", 5)));
+	assert(0 == strcmp("10.0.1.2:11211", Ketama_get_server(ketama, "37045", 5)));
+	assert(0 == strcmp("10.0.1.1:11211", Ketama_get_server(ketama, "50829", 5)));
+	assert(0 == strcmp("10.0.1.6:11211", Ketama_get_server(ketama, "65422", 5)));
+	assert(0 == strcmp("10.0.1.6:11211", Ketama_get_server(ketama, "74912", 5)));
+
 	Ketama_free(ketama);
 }
 

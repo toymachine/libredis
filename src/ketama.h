@@ -40,17 +40,9 @@ void Ketama_free(Ketama *ketama);
 
 void Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long weight);
 void Ketama_create_continuum(Ketama *ketama);
+void Ketama_print_continuum(Ketama *ketama);
 
-
-/** \brief Maps a key onto a server in the continuum.
-  * \param key The key that you want to map to a specific server.
-  * \param cont Pointer to the continuum in which we will search.
-  * \return The mcs struct that the given key maps to. */
-int Ketama_get_server(Ketama *ketama, char* key, size_t key_len);
-
-/** \brief Print the server list of a continuum to stdout.
-  * \param cont The continuum to print. */
-//void ketama_print_continuum( ketama_continuum c );
+char *Ketama_get_server(Ketama *ketama, char* key, size_t key_len);
 
 #endif
 

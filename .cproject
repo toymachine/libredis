@@ -424,6 +424,7 @@
 <tool id="cdt.managedbuild.tool.gnu.c.linker.exe.release.699059502" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.release">
 <option id="gnu.c.link.option.libs.1845595822" name="Libraries (-l)" superClass="gnu.c.link.option.libs" valueType="libs">
 <listOptionValue builtIn="false" value="event"/>
+<listOptionValue builtIn="false" value="m"/>
 </option>
 <inputType id="cdt.managedbuild.tool.gnu.c.linker.input.1004678549" superClass="cdt.managedbuild.tool.gnu.c.linker.input">
 <additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
@@ -813,6 +814,7 @@
 <tool id="cdt.managedbuild.tool.gnu.c.linker.exe.release.1887659273" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.release">
 <option id="gnu.c.link.option.libs.585879361" name="Libraries (-l)" superClass="gnu.c.link.option.libs" valueType="libs">
 <listOptionValue builtIn="false" value="event"/>
+<listOptionValue builtIn="false" value="m"/>
 </option>
 <option id="gnu.c.link.option.debugging.gprof.1471329691" name="Generate gprof information (-pg)" superClass="gnu.c.link.option.debugging.gprof" value="true" valueType="boolean"/>
 <inputType id="cdt.managedbuild.tool.gnu.c.linker.input.785915152" superClass="cdt.managedbuild.tool.gnu.c.linker.input">
