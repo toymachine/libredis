@@ -11,7 +11,9 @@
 Executor *Executor_new();
 void Executor_free(Executor *executor);
 
-void Executor_add(Executor *executor, Batch *batch, Connection *connection);
-void Executor_execute(Executor *executor);
+void Executor_add_batch_connection(Executor *executor, Batch *batch, Connection *connection);
+int Executor_execute(Executor *executor);
+
+int Executor_has_batch(Executor *executor);
 
 #endif /* EXECUTOR_H_ */

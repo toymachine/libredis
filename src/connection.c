@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
 
 #include "event.h"
 #include "common.h"
@@ -29,7 +30,6 @@ typedef enum _ConnectionState
 struct _Connection
 {
 	const char *addr;
-	int port;
 	int sockfd;
 	ConnectionState state;
 	struct event event_read;
@@ -40,7 +40,7 @@ struct _Connection
 
 void Connection_handle_event(int fd, short flags, void *data);
 
-Connection *Connection_new(const char *addr, int port)
+Connection *Connection_new(const char *addr)
 {
 	DEBUG(("alloc Connection\n"));
 	Connection *connection = Alloc_alloc_T(Connection);
@@ -51,7 +51,6 @@ Connection *Connection_new(const char *addr, int port)
 
 	//socket stuff:
 	connection->addr = addr;
-	connection->port = port;
 	connection->sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if(connection->sockfd == -1) {
 		printf("could not create socket\n");
@@ -100,10 +99,26 @@ void Connection_event_add(Connection *connection, struct event *event, long int 
 
 int Connection_connect(Connection *connection)
 {
+	int port = DEFAULT_IP_PORT;
+	char *pport;
+	char addr[22];
+	if(NULL == (pport = strchr(connection->addr, ':'))) {
+		printf("TODO add default port");
+		abort();
+	}
+	else {
+		port = atoi(pport + 1);
+		snprintf(addr, (pport - connection->addr + 1), "%s", connection->addr);
+	}
+	DEBUG(("connect to port: %d\n", port));
+	DEBUG(("connect to addr: '%s'\n", addr));
 	struct sockaddr_in sa;
 	sa.sin_family = AF_INET;
-	sa.sin_port = htons(connection->port);
-	inet_pton(AF_INET, connection->addr, &sa.sin_addr);
+	sa.sin_port = htons(port);
+	if(!inet_pton(AF_INET, addr, &sa.sin_addr)) {
+		printf("could not parse connection addr\n");
+		abort();
+	}
 	return connect(connection->sockfd, (struct sockaddr *) &sa, sizeof(struct sockaddr));
 }
 

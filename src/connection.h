@@ -4,7 +4,7 @@
 #include "common.h"
 #include "buffer.h"
 
-Connection *Connection_new(const char *addr, int port);
+Connection *Connection_new(const char *addr);
 void Connection_free(Connection *connection);
 int Connection_execute(Connection *connection, Batch *batch);
 

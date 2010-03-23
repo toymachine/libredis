@@ -1,13 +1,11 @@
 from redis import *
 
 def test_simple():
-    connection = Connection("127.0.0.1", 6379)
+    connection = Connection("127.0.0.1:6379")
 
     for j in range(10):
         print repr(connection.get('blaat'))
         
-    connection.free()
-
 def test_ketama():
     ketama = Ketama()
 
@@ -22,11 +20,23 @@ def test_ketama():
 
     ketama.create_continuum()
     print repr(ketama.get_server('12345'))
+    
+def test_mget():
+    ketama = Ketama()
+    ketama.add_server(("10.0.1.1", 11211), 300)
+    ketama.add_server(("10.0.1.2", 11211), 300)
+    ketama.add_server(("10.0.1.3", 11211), 300)
+    
+    ketama.create_continuum()
 
-    ketama.free()
+    connection_manager= ConnectionManager()
+    
+    redis = Redis(ketama, connection_manager)
+    
+    redis.mget(*['piet%d' % i for i in range(10)])
     
 if __name__ == '__main__':
     #test_ketama()
-    test_simple()
-    
+    #test_simple()
+    test_mget()
 

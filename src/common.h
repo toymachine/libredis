@@ -7,6 +7,7 @@
 #define MAX_BUFF_SIZE (1024 * 1024 * 4)
 #define MAX_CONNECTIONS 1024
 #define MIN(a,b) ((a)>(b)?(b):(a))
+#define DEFAULT_IP_PORT 6379
 
 #ifndef NDEBUG
 #define DEBUG(args) (printf("DEBUG: "), printf args)

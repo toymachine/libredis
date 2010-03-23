@@ -156,6 +156,7 @@ int Buffer_flip(Buffer *buffer)
 
 int Buffer_vprintf(Buffer *buffer, const char *format, va_list args)
 {
+	//TODO what about \0 that vsnprintf adds?
 	int remaining = buffer->limit - buffer->position;
 	int written = vsnprintf(buffer->data + buffer->position, remaining, format, args);
 	if(written > remaining) {

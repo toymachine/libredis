@@ -179,7 +179,11 @@ Batch *Batch_new()
 
 void _Batch_free(Batch *batch, int final)
 {
-	assert(list_empty(&batch->cmd_queue));
+	while(Batch_has_command(batch)) {
+		Command *command = Batch_next_command(batch);
+		Command_free(command);
+	}
+	//TODO free replies:
 	assert(list_empty(&batch->reply_queue));
 	if(final) {
 		Buffer_free(batch->read_buffer);
@@ -196,16 +200,17 @@ void _Batch_free(Batch *batch, int final)
 	Batch_list_free(batch, final);
 }
 
-
-void Batch_write_command(Batch *batch, const char *format, ...)
+void Batch_write(Batch *batch, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
 	Buffer_vprintf(batch->write_buffer, format, args);
 	va_end(args);
+}
 
+void Batch_add_command(Batch *batch)
+{
 	Command *cmd = Command_new();
-
 	list_add(&(cmd->list), &(batch->cmd_queue));
 }
 
