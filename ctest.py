@@ -23,9 +23,8 @@ def test_ketama():
     
 def test_mget():
     ketama = Ketama()
-    ketama.add_server(("10.0.1.1", 11211), 300)
-    ketama.add_server(("10.0.1.2", 11211), 300)
-    ketama.add_server(("10.0.1.3", 11211), 300)
+    ketama.add_server(("127.0.0.1", 6379), 300)
+    ketama.add_server(("127.0.0.1", 6380), 300)
     
     ketama.create_continuum()
 
@@ -33,10 +32,33 @@ def test_mget():
     
     redis = Redis(ketama, connection_manager)
     
-    redis.mget(*['piet%d' % i for i in range(10)])
+    redis.set('piet1', 'blaat1')
+    redis.set('piet5', 'blaat5')
     
+    M = 100000
+    N = 40
+    keys = ['piet%d' % i for i in range(N)]
+    for i in range(M):
+        redis.mget(*keys)
+    print N * M
+    
+def profile(f = None):
+    from cProfile import Profile
+    prof = Profile()
+    try:
+        prof = prof.runctx("f()", globals(), locals())
+    except SystemExit:
+        pass
+
+    import pstats
+    stats = pstats.Stats(prof)
+    stats.strip_dirs()
+    stats.sort_stats('time')
+    stats.print_stats(20)
+
 if __name__ == '__main__':
     #test_ketama()
     #test_simple()
+    #profile(test_mget)
     test_mget()
-
+    

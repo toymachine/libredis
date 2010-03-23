@@ -16,12 +16,10 @@ void Batch_add_command(Batch *batch);
 int Batch_has_command(Batch *batch);
 Command *Batch_next_command(Batch *batch);
 
-int Batch_execute(Batch *batch, Connection *connection);
-
 //replies
 void Batch_add_reply(Batch *batch, Reply *reply);
 int Batch_has_reply(Batch *batch);
-Reply *Batch_next_reply(Batch *batch);
+Reply *Batch_pop_reply(Batch *batch);
 
 //buffers (private interface to connection)
 Buffer *Batch_read_buffer(Batch *batch);

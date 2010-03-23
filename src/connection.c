@@ -259,8 +259,8 @@ void Connection_handle_event(int fd, short flags, void *data)
 {
 	Connection *connection = (Connection *)data;
 
-	DEBUG(("con event, fd: %d, state: %d, readable: %d, writeable: %d, timeout: %d\n", connection->sockfd,
-			connection->state, (flags & EV_READ) ? 1 : 0, (flags & EV_WRITE) ? 1 : 0, (flags & EV_TIMEOUT) ? 1 : 0 ));
+	DEBUG(("con event, fd: %d, state: %d, flags: %d, readable: %d, writeable: %d, timeout: %d\n", connection->sockfd,
+			connection->state, flags, (flags & EV_READ) ? 1 : 0, (flags & EV_WRITE) ? 1 : 0, (flags & EV_TIMEOUT) ? 1 : 0 ));
 
 	if(flags & EV_WRITE) {
 		if(flags & EV_TIMEOUT) {

@@ -1,6 +1,9 @@
-- buffer grow stuff
+- buffer grow stuff, 
+- vsprint last 0 stuff
 - executor/helper/ketama hashing
 - socket creation errors
+- connection timeout
+- remove executor
 - connection (re) connect and errors
 - connection reply parser error
 - connection read and write timeouts

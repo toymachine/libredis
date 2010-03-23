@@ -37,7 +37,7 @@ struct _Reply
 	size_t len;
 
 	struct list_head children;
-	struct list_head *current;
+	struct list_head *current; //child iterator
 };
 
 ALLOC_LIST_T(Reply, list)
@@ -76,17 +76,14 @@ int Reply_add_child(Reply *reply, Reply *child)
 	return 0;
 }
 
-int Reply_next_child(Reply *reply, Reply **child)
+int Reply_has_child(Reply *reply)
 {
-	reply->current = reply->current->next;
-	if(reply->current == &reply->children) {
-		*child = NULL;
-		return 0;
-	}
-	else {
-		*child = list_entry(reply->current, Reply, list);
-		return 1;
-	}
+	return !list_empty(&reply->children);
+}
+
+Reply *Reply_pop_child(Reply *reply)
+{
+	return list_pop_T(Reply, list, &reply->children);
 }
 
 size_t Reply_length(Reply *reply)
@@ -122,8 +119,8 @@ int Reply_dump(Reply *reply) {
 	}
 	case RT_MULTIBULK: {
 		printf("multi bulk reply, count: %d\n", Reply_length(reply));
-		Reply *child = NULL;
-		while(Reply_next_child(reply, &child)) {
+		Reply *child;
+		list_for_each_entry(child, &reply->children, list) {
 			assert(child != NULL);
 			ReplyType child_type = Reply_type(child);
 			if(RT_BULK == child_type) {
@@ -245,7 +242,7 @@ int Batch_has_reply(Batch *batch)
 	return !list_empty(&batch->reply_queue);
 }
 
-Reply *Batch_next_reply(Batch *batch)
+Reply *Batch_pop_reply(Batch *batch)
 {
 	if(Batch_has_reply(batch)) {
 		Command *cmd = list_pop_T(Command, list, &batch->reply_queue);
@@ -266,18 +263,6 @@ Buffer *Batch_write_buffer(Batch *batch)
 	return batch->write_buffer;
 }
 
-#include "event.h"
-
-int Batch_execute(Batch *batch, Connection *connection)
-{
-	Connection_execute(connection, batch);
-
-	DEBUG(("before ev disp\n"));
-	event_dispatch();
-	DEBUG(("after ev disp\n"));
-
-	return 0;
-}
 
 
 
