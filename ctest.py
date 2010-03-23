@@ -1,5 +1,7 @@
 from redis import *
 
+import time
+
 def test_simple():
     connection = Connection("127.0.0.1:6379")
 
@@ -32,15 +34,22 @@ def test_mget():
     
     redis = Redis(ketama, connection_manager)
     
-    redis.set('piet1', 'blaat1')
-    redis.set('piet5', 'blaat5')
     
-    M = 100000
-    N = 40
+#    M = 1000
+#    N = 200
+    M = 10000
+    N = 200
     keys = ['piet%d' % i for i in range(N)]
+
+    for i in range(N):
+        redis.set('piet%d' % i, 'blaat%d' % i)
+        assert(redis.get('piet%d' % i) == 'blaat%d' % i)
+        #print '******', repr(redis.get('piet%d' % i))
+    start = time.time()
     for i in range(M):
         redis.mget(*keys)
-    print N * M
+    end = time.time()
+    print (N * M) / (end - start)
     
 def profile(f = None):
     from cProfile import Profile

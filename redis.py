@@ -145,8 +145,7 @@ class Redis(object):
         self.server_hash = server_hash
         self.connection_manager = connection_manager
 
-    def _execute_simple(self, key, format, *args):
-        batch = Batch()
+    def _execute_simple(self, batch, key, format, *args):
         batch.write(format, *args)
         batch.add_command()
         server_addr = self.server_hash.get_server(key)
@@ -156,8 +155,15 @@ class Redis(object):
         return batch.pop_reply()
         
     def set(self, key, value):
-        return self._execute_simple(key, "SET %s %d\r\n%s\r\n", key, len(value), value)
-        
+        batch = Batch()
+        reply = self._execute_simple(batch, key, "SET %s %d\r\n%s\r\n", key, len(value), value)
+        return reply.value
+    
+    def get(self, key):
+        batch = Batch()
+        reply = self._execute_simple(batch, key, "GET %s\r\n", key)
+        return reply.value
+    
     def mget(self, *keys):
         batches = {}
         #add all keys to batches
@@ -188,4 +194,3 @@ class Redis(object):
                 child = reply.pop_child()
                 results[key] = child.value
         return results
-    
