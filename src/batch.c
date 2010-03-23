@@ -72,7 +72,7 @@ void _Reply_free(Reply *reply, int final)
 
 int Reply_add_child(Reply *reply, Reply *child)
 {
-	list_add_tail(&child->list, &reply->children);
+	list_add(&child->list, &reply->children);
 	return 0;
 }
 

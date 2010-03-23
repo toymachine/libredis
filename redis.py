@@ -2,8 +2,11 @@ import atexit
 
 from ctypes import *
 
-#libredis = cdll.LoadLibrary("Debug/libredis.so")
-libredis = cdll.LoadLibrary("Release/libredis.so")
+import sys
+if '--debug' in sys.argv:
+    libredis = cdll.LoadLibrary("Debug/libredis.so")
+else:
+    libredis = cdll.LoadLibrary("Release/libredis.so")
 
 libredis.Module_init()
 atexit.register(libredis.Module_free)
@@ -172,6 +175,7 @@ class Redis(object):
             batch = batches.get(server_ip, None)
             if batch is None: #new batch
                 batch = Batch()
+                batch.add_command()
                 batch.write("MGET")
                 batch.keys = []
                 batches[server_ip] = batch
@@ -180,7 +184,6 @@ class Redis(object):
         #finalize batches, and start executing
         for server_ip, batch in batches.items():
             batch.write("\r\n")
-            batch.add_command()
             connection = self.connection_manager.get_connection(server_ip)
             connection.execute(batch)
         #handle events until all complete
@@ -192,5 +195,6 @@ class Redis(object):
             reply = batch.pop_reply()
             for key in batch.keys:
                 child = reply.pop_child()
-                results[key] = child.value
+                value = child.value
+                results[key] = value
         return results

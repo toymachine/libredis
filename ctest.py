@@ -2,6 +2,23 @@ from redis import *
 
 import time
 
+class _Timer:
+    def __enter__(self):
+        self._start = time.time()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self._end = time.time()
+
+    def __str__(self):
+        self._end - self._start
+
+    def sec(self, n):
+        return n / (self._end - self._start)
+    
+def timer():
+    return _Timer()
+
 def test_simple():
     connection = Connection("127.0.0.1:6379")
 
@@ -37,8 +54,8 @@ def test_mget():
     
 #    M = 1000
 #    N = 200
-    M = 10000
-    N = 200
+    M = 10
+    N = 10
     keys = ['piet%d' % i for i in range(N)]
 
     for i in range(N):
@@ -47,7 +64,7 @@ def test_mget():
         #print '******', repr(redis.get('piet%d' % i))
     start = time.time()
     for i in range(M):
-        redis.mget(*keys)
+        print redis.mget(*keys)
     end = time.time()
     print (N * M) / (end - start)
     
@@ -65,6 +82,18 @@ def profile(f = None):
     stats.sort_stats('time')
     stats.print_stats(20)
 
+def test_mget_fast():
+    M = 1000
+    N = 200
+    with timer() as tmr:
+        for i in range(M):
+            batch = Batch()
+            batch.write("MGET")
+            for j in range(N):
+                batch.write(" %s", 'piet%d' % i)
+            batch.write("\r\n")
+    print 'mfast', tmr.sec(N * M)
+    
 if __name__ == '__main__':
     #test_ketama()
     #test_simple()
