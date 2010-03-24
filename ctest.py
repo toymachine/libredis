@@ -38,7 +38,16 @@ def test_ketama():
     ketama.add_server(("10.0.1.8", 11211), 100)
 
     ketama.create_continuum()
-    print repr(ketama.get_server('12345'))
+    #ketama.print_continuum()
+    def check(key, addr):
+        assert addr == ketama.get_server_addr(ketama.get_server(key))
+        
+    check('12936', '10.0.1.7:11211')
+    check('27804', '10.0.1.5:11211')
+    check('37045', '10.0.1.2:11211')
+    check('50829', '10.0.1.1:11211')
+    check('65422', '10.0.1.6:11211')
+    check('74912', '10.0.1.6:11211')
     
 def test_mget():
     ketama = Ketama()
@@ -82,18 +91,6 @@ def profile(f = None):
     stats.sort_stats('time')
     stats.print_stats(20)
 
-def test_mget_fast():
-    M = 1000
-    N = 200
-    with timer() as tmr:
-        for i in range(M):
-            batch = Batch()
-            batch.write("MGET")
-            for j in range(N):
-                batch.write(" %s", 'piet%d' % i)
-            batch.write("\r\n")
-    print 'mfast', tmr.sec(N * M)
-    
 if __name__ == '__main__':
     #test_ketama()
     #test_simple()

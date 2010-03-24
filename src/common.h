@@ -23,11 +23,12 @@ typedef char Byte;
 
 #include "alloc.h"
 
-typedef char * (*hashmethodfunc)(void *instance, char *key, size_t key_len);
+typedef int (*hashmethodfunc)(void *instance, char *key, size_t key_len);
 
 typedef struct _HashMethodDelegate
 {
 	void *instance;
+	int max_ordinal;
 	hashmethodfunc func;
 } HashMethodDelegate;
 

@@ -1,4 +1,5 @@
 - buffer grow stuff, 
+- factor out event loop
 - vsprint last 0 stuff
 - executor/helper/ketama hashing
 - socket creation errors

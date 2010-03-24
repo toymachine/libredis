@@ -19,12 +19,14 @@ class Connection(object):
         batch = Batch()
         batch.write("GET %s\r\n", key)
         batch.add_command()
-        batch.execute(self)
-        reply = batch.next_reply()
+        self.execute(batch)
+        reply = batch.pop_reply()
         return reply.value
     
-    def execute(self, batch):    
+    def execute(self, batch, dispatch = True):    
         libredis.Connection_execute(self._connection, batch._batch)
+        if dispatch:
+            libredis.Module_dispatch()
 
     def free(self):
         libredis.Connection_free(self._connection)
@@ -99,9 +101,6 @@ class Batch(object):
     def add_command(self):
         libredis.Batch_add_command(self._batch)
     
-    def execute(self, connection):
-        libredis.Batch_execute(self._batch, connection._connection)
-
     def has_reply(self):
         return bool(libredis.Batch_has_reply(self._batch))
 
@@ -121,7 +120,7 @@ class Batch(object):
             self.free()
 
 class Ketama(object):
-    libredis.Ketama_get_server.restype = c_char_p
+    libredis.Ketama_get_server_addr.restype = c_char_p
     
     def __init__(self):
         self._ketama = libredis.Ketama_new()
@@ -132,8 +131,14 @@ class Ketama(object):
     def create_continuum(self):
         libredis.Ketama_create_continuum(self._ketama)
 
+    def print_continuum(self):
+        libredis.Ketama_print_continuum(self._ketama)
+
     def get_server(self, key):
         return libredis.Ketama_get_server(self._ketama, key, len(key))
+
+    def get_server_addr(self, ordinal):
+        return libredis.Ketama_get_server_addr(self._ketama, ordinal)
 
     def free(self):
         libredis.Ketama_free(self._ketama)
@@ -151,10 +156,9 @@ class Redis(object):
     def _execute_simple(self, batch, key, format, *args):
         batch.write(format, *args)
         batch.add_command()
-        server_addr = self.server_hash.get_server(key)
+        server_addr = self.server_hash.get_server_addr(self.server_hash.get_server(key))
         connection = self.connection_manager.get_connection(server_addr)
         connection.execute(batch)
-        libredis.Module_dispatch()
         return batch.pop_reply()
         
     def set(self, key, value):
@@ -171,7 +175,7 @@ class Redis(object):
         batches = {}
         #add all keys to batches
         for key in keys:
-            server_ip = self.server_hash.get_server(key)
+            server_ip = self.server_hash.get_server_addr(self.server_hash.get_server(key))
             batch = batches.get(server_ip, None)
             if batch is None: #new batch
                 batch = Batch()
@@ -185,7 +189,7 @@ class Redis(object):
         for server_ip, batch in batches.items():
             batch.write("\r\n")
             connection = self.connection_manager.get_connection(server_ip)
-            connection.execute(batch)
+            connection.execute(batch, False)
         #handle events until all complete
         libredis.Module_dispatch()
         #build up results
@@ -198,3 +202,4 @@ class Redis(object):
                 value = child.value
                 results[key] = value
         return results
+    

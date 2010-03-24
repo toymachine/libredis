@@ -39,16 +39,16 @@
 #include "common.h"
 #include "list.h"
 
+#define INIT_MAX_SERVERS 1
+
 typedef struct
 {
     unsigned int point;  // point on circle
-    char ip[22];
+    int ordinal; // entry of server info
 } mcs;
 
 typedef struct
 {
-	struct list_head list;
-
     char addr[22];
     unsigned long memory;
 } serverinfo;
@@ -57,9 +57,11 @@ struct _Ketama
 {
     int numpoints;
     unsigned int numservers;
+    unsigned int maxservers;
     unsigned long memory;
     mcs* continuum; //array of mcs structs
-    struct list_head servers;
+    serverinfo *servers; //array of numservers serverinfo structs
+    HashMethodDelegate hmd;
 };
 
 typedef int (*compfn)( const void*, const void* );
@@ -71,9 +73,10 @@ Ketama *Ketama_new()
 	Ketama *ketama = Alloc_alloc_T(Ketama);
 	ketama->numpoints = 0;
 	ketama->numservers = 0;
+	ketama->maxservers = 0;
 	ketama->memory = 0;
 	ketama->continuum = NULL;
-	INIT_LIST_HEAD(&ketama->servers);
+	ketama->servers = NULL;
 	return ketama;
 }
 
@@ -81,20 +84,32 @@ void Ketama_free(Ketama *ketama)
 {
 	if(ketama->continuum != NULL) {
 		Alloc_free(ketama->continuum, ketama->numservers * sizeof(mcs) * 160);
+		ketama->continuum = NULL;
 	}
-	while(!list_empty(&ketama->servers)) {
-		serverinfo *sinfo = list_pop_T(serverinfo, list, &ketama->servers);
-		Alloc_free_T(sinfo, serverinfo);
+	if(ketama->servers != NULL) {
+		Alloc_free(ketama->servers, ketama->maxservers * sizeof(serverinfo));
+		ketama->servers = NULL;
 	}
 	Alloc_free_T(ketama, Ketama);
 }
 
 void Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long weight)
 {
-	serverinfo *info = Alloc_alloc_T(serverinfo);
+	assert(ketama->numservers <= ketama->maxservers);
+	if(ketama->servers == NULL) {
+		DEBUG(("ketama init server list\n"));
+		ketama->maxservers = INIT_MAX_SERVERS;
+		ketama->servers = Alloc_alloc(sizeof(serverinfo) * ketama->maxservers);
+	}
+	if(ketama->numservers >= ketama->maxservers) {
+		int oldmaxservers = ketama->maxservers;
+		ketama->maxservers *= 2;
+		DEBUG(("ketama expand server list from %d to %d entries\n", oldmaxservers, ketama->maxservers));
+		ketama->servers = Alloc_realloc(ketama->servers, sizeof(serverinfo) * ketama->maxservers, sizeof(serverinfo) * oldmaxservers);
+	}
+	serverinfo *info = &(ketama->servers[ketama->numservers]);
 	sprintf(info->addr, "%s:%d", addr, port);
 	info->memory = weight;
-	list_add(&info->list, &ketama->servers);
 	ketama->numservers += 1;
 	ketama->memory += weight;
 }
@@ -130,8 +145,17 @@ unsigned int Ketama_hashi( char* inString, size_t inLen )
                         |   digest[0] );
 }
 
+char *Ketama_get_server_addr(Ketama *ketama, int ordinal)
+{
+	assert(ordinal >= 0);
+	assert(ordinal < ketama->numservers);
+	assert(ketama->servers != NULL);
 
-char *Ketama_get_server(Ketama *ketama, char* key, size_t key_len)
+	return ketama->servers[ordinal].addr;
+}
+
+
+int Ketama_get_server(Ketama *ketama, char* key, size_t key_len)
 {
     unsigned int h = Ketama_hashi( key, key_len );
     int highp = ketama->numpoints;
@@ -146,14 +170,14 @@ char *Ketama_get_server(Ketama *ketama, char* key, size_t key_len)
         midp = (int)( ( lowp+highp ) / 2 );
 
         if ( midp == ketama->numpoints ) {
-            return mcsarr[0].ip; // if at the end, roll back to zeroth
+            return mcsarr[0].ordinal; // if at the end, roll back to zeroth
         }
 
         midval = mcsarr[midp].point;
         midval1 = midp == 0 ? 0 : mcsarr[midp-1].point;
 
         if ( h <= midval && h > midval1 ) {
-            return mcsarr[midp].ip;
+            return mcsarr[midp].ordinal;
         }
 
         if ( midval < h ) {
@@ -164,17 +188,17 @@ char *Ketama_get_server(Ketama *ketama, char* key, size_t key_len)
         }
 
         if ( lowp > highp ) {
-            return mcsarr[0].ip;
+            return mcsarr[0].ordinal;
         }
     }
 }
 
-HashMethodDelegate Ketama_get_hash_method(Ketama *ketama)
+HashMethodDelegate *Ketama_get_hash_method(Ketama *ketama)
 {
-	HashMethodDelegate delegate;
-	delegate.instance = ketama;
-	delegate.func = (hashmethodfunc)Ketama_get_server;
-	return delegate;
+	ketama->hmd.instance = ketama;
+	ketama->hmd.func = (hashmethodfunc)Ketama_get_server;
+	ketama->hmd.max_ordinal = ketama->numservers;
+	return &ketama->hmd;
 }
 
 
@@ -191,12 +215,12 @@ void Ketama_create_continuum(Ketama *ketama)
     /* Continuum will hold one mcs for each point on the circle: */
     assert(ketama->continuum == NULL);
     ketama->continuum = Alloc_alloc(ketama->numservers * sizeof(mcs) * 160);
-    unsigned int i = 0, k, cont = 0;
+    unsigned k, cont = 0;
 
-    serverinfo *sinfo;
-    list_for_each_entry(sinfo, &ketama->servers, list)
+    for(int i = 0; i < ketama->numservers; i++)
     {
-        float pct = (float)sinfo->memory / (float)ketama->memory;
+        serverinfo *sinfo = &(ketama->servers[i]);
+    	float pct = (float)sinfo->memory / (float)ketama->memory;
         unsigned int ks = floorf( pct * 40.0 * (float)ketama->numservers );
 #ifndef NDEBUG
         int hpct = floorf( pct * 100.0 );
@@ -222,11 +246,10 @@ void Ketama_create_continuum(Ketama *ketama)
                                       | ( digest[1+h*4] <<  8 )
                                       |   digest[h*4];
 
-                memcpy( ketama->continuum[cont].ip, sinfo->addr, 22 );
+				ketama->continuum[cont].ordinal = i;
                 cont++;
             }
         }
-        i++;
     }
 
     DEBUG(("cont: %d\n", cont));
@@ -251,7 +274,7 @@ void Ketama_print_continuum( Ketama *ketama )
     {
         for( a = 0; a < ketama->numpoints; a++ )
         {
-            printf( "%s (%u)\n", ketama->continuum[a].ip, ketama->continuum[a].point );
+            printf( "%d (%u)\n", ketama->continuum[a].ordinal, ketama->continuum[a].point );
         }
     }
 }

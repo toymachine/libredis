@@ -263,6 +263,10 @@ Buffer *Batch_write_buffer(Batch *batch)
 	return batch->write_buffer;
 }
 
+void Batch_list_add(Batch *batch, struct list_head *head)
+{
+	list_add(&batch->list, head);
+}
 
 
 

@@ -20,11 +20,20 @@ static inline void _Alloc_free(void *obj, size_t size)
 	DEBUG(("dealloc real: %d total now: %d\n", size, allocated));
 }
 
+static inline void *_Alloc_realloc(void *obj, size_t new_size, size_t old_size)
+{
+	allocated -= old_size;
+	allocated += new_size;
+	DEBUG(("realloc real: %d total now: %d\n", new_size, allocated));
+	return realloc(obj, new_size);
+}
+
 #define Alloc_alloc_T(T) (T *) _Alloc_alloc(sizeof(T))
 #define Alloc_free_T(PT, T) _Alloc_free(PT, sizeof(T))
 
 #define Alloc_alloc(SZ) _Alloc_alloc(SZ)
 #define Alloc_free(PT, SZ) _Alloc_free(PT, SZ)
+#define Alloc_realloc(PT, SZ, OSZ) _Alloc_realloc(PT, SZ, OSZ)
 
 #define ALLOC_LIST_T(T, member) \
 	static struct list_head T ## _free_list = LIST_HEAD_INIT(T ## _free_list); \
