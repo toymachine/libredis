@@ -9,8 +9,15 @@ typedef struct _Batch Batch;
 typedef struct _Connection Connection;
 typedef struct _Ketama Ketama;
 
+Connection *Connection_new(const char *addr);
+void Connection_free(Connection *connection);
+int Connection_execute(Connection *connection, Batch *batch);
+
 Batch *Batch_new();
 void Batch_free(Batch *batch);
+void Batch_write(Batch *batch, const char *str, size_t str_len);
+void Batch_writef(Batch *batch, const char *format, ...);
+void Batch_add_command(Batch *batch);
 
 Ketama *Ketama_new();
 void Ketama_free(Ketama *ketama);

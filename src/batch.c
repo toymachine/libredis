@@ -197,12 +197,17 @@ void _Batch_free(Batch *batch, int final)
 	Batch_list_free(batch, final);
 }
 
-void Batch_write(Batch *batch, const char *format, ...)
+void Batch_writef(Batch *batch, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
 	Buffer_vprintf(batch->write_buffer, format, args);
 	va_end(args);
+}
+
+void Batch_write(Batch *batch, const char *str, size_t str_len)
+{
+	Buffer_printf(batch->write_buffer, "%.*s", str_len, str);
 }
 
 void Batch_add_command(Batch *batch)

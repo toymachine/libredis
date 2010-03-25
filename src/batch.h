@@ -10,8 +10,6 @@
 void Batch_free_final();
 
 //commands
-void Batch_write(Batch *batch, const char *format, ...);
-void Batch_add_command(Batch *batch);
 int Batch_has_command(Batch *batch);
 Command *Batch_next_command(Batch *batch);
 

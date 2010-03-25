@@ -17,7 +17,7 @@ class Connection(object):
 
     def get(self, key):
         batch = Batch()
-        batch.write("GET %s\r\n", key)
+        batch.writef("GET %s\r\n", key)
         batch.add_command()
         self.execute(batch)
         reply = batch.pop_reply()
@@ -95,8 +95,8 @@ class Batch(object):
     def __init__(self):
         self._batch = libredis.Batch_new()
 
-    def write(self, format, *args):
-        libredis.Batch_write(self._batch, format, *args)
+    def writef(self, format, *args):
+        libredis.Batch_writef(self._batch, format, *args)
 
     def add_command(self):
         libredis.Batch_add_command(self._batch)
@@ -154,7 +154,7 @@ class Redis(object):
         self.connection_manager = connection_manager
 
     def _execute_simple(self, batch, key, format, *args):
-        batch.write(format, *args)
+        batch.writef(format, *args)
         batch.add_command()
         server_addr = self.server_hash.get_server_addr(self.server_hash.get_server(key))
         connection = self.connection_manager.get_connection(server_addr)
@@ -180,14 +180,14 @@ class Redis(object):
             if batch is None: #new batch
                 batch = Batch()
                 batch.add_command()
-                batch.write("MGET")
+                batch.writef("MGET")
                 batch.keys = []
                 batches[server_ip] = batch
-            batch.write(" %s", key)
+            batch.writef(" %s", key)
             batch.keys.append(key)
         #finalize batches, and start executing
         for server_ip, batch in batches.items():
-            batch.write("\r\n")
+            batch.writef("\r\n")
             connection = self.connection_manager.get_connection(server_ip)
             connection.execute(batch, False)
         #handle events until all complete

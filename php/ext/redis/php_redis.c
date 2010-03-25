@@ -7,20 +7,30 @@
 
 #include "redis.h"
 
-zend_class_entry *ketama_ce;
+#define T_fromObj(T, ce, obj) (T *)Z_LVAL_P(zend_read_property(ce, obj, "handle", 6, 0))
+#define T_getThis(T, ce) (T *)Z_LVAL_P(zend_read_property(ce, getThis(), "handle", 6, 0))
+#define T_setThis(p, ce) zend_update_property_long(ce, getThis(), "handle", 6, (long)p);
 
-#define Ketama_getThis() (Ketama *)Z_LVAL_P(zend_read_property(ketama_ce, getThis(), "handle", 6, 0))
+zend_class_entry *batch_ce;
+zend_class_entry *ketama_ce;
+zend_class_entry *connection_ce;
+
+
+/**************** KETAMA ***********************/
+
+
+#define Ketama_getThis() T_getThis(Ketama, ketama_ce)
+#define Ketama_setThis(p) T_setThis(p, ketama_ce)
 
 PHP_METHOD(Ketama, __construct)
 {
-	Ketama *ketama = Ketama_new();
-	zend_update_property_long(ketama_ce, getThis(), "handle", 6, (long)ketama);
+	Ketama_setThis(Ketama_new());
 }
 
 PHP_METHOD(Ketama, __destruct)
 {
 	Ketama_free(Ketama_getThis());
-	zend_update_property_long(ketama_ce, getThis(), "handle", 6, 0);
+	Ketama_setThis(0);
 }
 
 PHP_METHOD(Ketama, add_server)
@@ -75,12 +85,116 @@ function_entry ketama_methods[] = {
     {NULL, NULL, NULL}
 };
 
+/**************** CONNECTIONS ***********************/
+
+#define Connection_getThis() T_getThis(Connection, connection_ce)
+#define Connection_setThis(p) T_setThis(p, connection_ce)
+
+PHP_METHOD(Connection, __construct)
+{
+	char *addr;
+	int addr_len;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &addr, &addr_len) == FAILURE) {
+		RETURN_NULL();
+	}
+
+	Connection_setThis(Connection_new(addr));
+}
+
+PHP_METHOD(Connection, __destruct)
+{
+	Connection_free(Connection_getThis());
+	Connection_setThis(0);
+}
+
+PHP_METHOD(Connection, execute)
+{
+	zval *obj;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "O", &obj, batch_ce) == FAILURE) {
+		RETURN_NULL();
+	}
+
+	Batch *batch = T_fromObj(Batch, batch_ce, obj);
+	printf("conn exec batch %x\n", batch);
+
+	Connection_execute(Connection_getThis(), batch);
+//	Batch_write(Batch_getThis(), str, str_len);
+}
+
+function_entry connection_methods[] = {
+    PHP_ME(Connection,  __construct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR)
+    PHP_ME(Connection,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
+    PHP_ME(Connection,  execute,           NULL, ZEND_ACC_PUBLIC)
+    {NULL, NULL, NULL}
+};
+
+/**************** BATCH ***********************/
+
+
+#define Batch_getThis() T_getThis(Batch, batch_ce)
+#define Batch_setThis(p) T_setThis(p, batch_ce)
+
+PHP_METHOD(Batch, __construct)
+{
+	Batch_setThis(Batch_new());
+}
+
+PHP_METHOD(Batch, __destruct)
+{
+	Batch_free(Batch_getThis());
+	Batch_setThis(0);
+}
+
+PHP_METHOD(Batch, write)
+{
+	char *str;
+	int str_len;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &str, &str_len) == FAILURE) {
+		RETURN_NULL();
+	}
+
+	printf("batch wr on %x\n", Batch_getThis());
+	Batch_write(Batch_getThis(), str, str_len);
+}
+
+PHP_METHOD(Batch, add_command)
+{
+	Batch_add_command(Batch_getThis());
+}
+
+function_entry batch_methods[] = {
+    PHP_ME(Batch,  __construct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR)
+    PHP_ME(Batch,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
+    PHP_ME(Batch,  write,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Batch,  add_command,           NULL, ZEND_ACC_PUBLIC)
+    {NULL, NULL, NULL}
+};
+
+/***************** PHP MODULE **************************/
+
+PHP_FUNCTION(Redis_dispatch)
+{
+	Module_dispatch();
+}
+
 PHP_MINIT_FUNCTION(redis)
 {
     zend_class_entry ce;
-    INIT_CLASS_ENTRY(ce, "Ketama", ketama_methods);
+
+    INIT_CLASS_ENTRY(ce, "Redis_Ketama", ketama_methods);
     ketama_ce = zend_register_internal_class(&ce TSRMLS_CC);
     zend_declare_property_long(ketama_ce, "handle", 6, 0, ZEND_ACC_PRIVATE);
+
+    INIT_CLASS_ENTRY(ce, "Redis_Connection", connection_methods);
+    connection_ce = zend_register_internal_class(&ce TSRMLS_CC);
+    zend_declare_property_long(connection_ce, "handle", 6, 0, ZEND_ACC_PRIVATE);
+
+    INIT_CLASS_ENTRY(ce, "Redis_Batch", batch_methods);
+    batch_ce = zend_register_internal_class(&ce TSRMLS_CC);
+    zend_declare_property_long(batch_ce, "handle", 6, 0, ZEND_ACC_PRIVATE);
 
     Module_init();
 
@@ -96,7 +210,7 @@ PHP_MSHUTDOWN_FUNCTION(redis)
 }
 
 static function_entry redis_functions[] = {
-    PHP_FE(hello_world, NULL)
+    PHP_FE(Redis_dispatch, NULL)
     {NULL, NULL, NULL}
 };
 
@@ -121,7 +235,3 @@ zend_module_entry redis_module_entry = {
 ZEND_GET_MODULE(redis)
 #endif
 
-PHP_FUNCTION(hello_world)
-{
-    RETURN_STRING("Hello World3!", 1);
-}

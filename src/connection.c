@@ -29,7 +29,7 @@ typedef enum _ConnectionState
 
 struct _Connection
 {
-	const char *addr;
+	char addr[22];
 	int sockfd;
 	ConnectionState state;
 	struct event event_read;
@@ -50,7 +50,8 @@ Connection *Connection_new(const char *addr)
 	connection->parser = ReplyParser_new();
 
 	//socket stuff:
-	connection->addr = addr;
+	snprintf(connection->addr, 22, "%s", addr);
+	DEBUG(("Connection addr: '%s'\n", connection->addr));
 	connection->sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if(connection->sockfd == -1) {
 		printf("could not create socket\n");
@@ -102,6 +103,7 @@ int Connection_connect(Connection *connection)
 	int port = DEFAULT_IP_PORT;
 	char *pport;
 	char addr[22];
+	DEBUG(("parsing connection addr: %s\n", connection->addr));
 	if(NULL == (pport = strchr(connection->addr, ':'))) {
 		printf("TODO add default port");
 		abort();

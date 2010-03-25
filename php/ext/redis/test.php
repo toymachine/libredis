@@ -1,9 +1,7 @@
 <?php
 
-echo hello_world();
-
 function test_ketama() {
-	$ketama = new Ketama();
+	$ketama = new Redis_Ketama();
     $ketama->add_server("10.0.1.1", 11211, 600);
     $ketama->add_server("10.0.1.2", 11211, 300);
     $ketama->add_server("10.0.1.3", 11211, 200);
@@ -20,6 +18,29 @@ function test_ketama() {
 	echo "addr: ", $ketama->get_server_addr($ordinal), PHP_EOL;
 }
 
-test_ketama();
+function test_connection() {
+	
+	$connection = new Redis_Connection("127.0.0.1:6379");
+	
+	$batch = new Redis_Batch();
+	$key = "piet";
+    $batch->write("GET $key\r\n");	
+	$batch->add_command();
+	
+	$connection->execute($batch);
+	
+	Redis_dispatch();
+	
+/*
+        self.execute(batch)
+        reply = batch.pop_reply()
+        return reply.value
+*/
 
+}
+
+//test_ketama();
+test_connection();
+
+echo "done...!", PHP_EOL;
 ?>
