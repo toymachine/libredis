@@ -1,6 +1,7 @@
 #ifndef __BATCH_H
 #define __BATCH_H
 
+#include "redis.h"
 #include "common.h"
 #include "command.h"
 #include "reply.h"

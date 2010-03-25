@@ -36,9 +36,7 @@ typedef struct _HashMethodDelegate
 	hashmethodfunc func;
 } HashMethodDelegate;
 
-typedef struct _Batch Batch;
 typedef struct _Command Command;
-typedef struct _Connection Connection;
 typedef struct _Reply Reply;
 
 #endif

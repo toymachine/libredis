@@ -12,6 +12,12 @@ function test_ketama() {
     $ketama->add_server("10.0.1.6", 11211, 800);
     $ketama->add_server("10.0.1.7", 11211, 950);
     $ketama->add_server("10.0.1.8", 11211, 100);
+    
+    $ketama->create_continuum();
+    
+    $ordinal = $ketama->get_server("piet5234");
+	echo "ord: ", $ordinal, PHP_EOL;
+	echo "addr: ", $ketama->get_server_addr($ordinal), PHP_EOL;
 }
 
 test_ketama();

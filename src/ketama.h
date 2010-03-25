@@ -31,16 +31,11 @@
 
 #include <string.h>
 
+#include "redis.h"
 #include "common.h"
 
 HashMethodDelegate *Ketama_get_hash_method(Ketama *ketama);
 
-void Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long weight);
-void Ketama_create_continuum(Ketama *ketama);
-void Ketama_print_continuum(Ketama *ketama);
-
-int Ketama_get_server(Ketama *ketama, char* key, size_t key_len);
-char *Ketama_get_server_addr(Ketama *ketama, int ordinal);
 
 #endif
 
