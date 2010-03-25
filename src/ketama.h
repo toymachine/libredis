@@ -33,10 +33,6 @@
 
 #include "common.h"
 
-typedef struct _Ketama Ketama;
-
-Ketama *Ketama_new();
-void Ketama_free(Ketama *ketama);
 HashMethodDelegate *Ketama_get_hash_method(Ketama *ketama);
 
 void Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long weight);

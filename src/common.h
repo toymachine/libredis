@@ -6,7 +6,11 @@
 #define DEFAULT_COMMAND_BUFF_SIZE 64
 #define MAX_BUFF_SIZE (1024 * 1024 * 4)
 #define MAX_CONNECTIONS 1024
+
+#ifndef MIN
 #define MIN(a,b) ((a)>(b)?(b):(a))
+#endif
+
 #define DEFAULT_IP_PORT 6379
 
 #ifndef NDEBUG
@@ -36,6 +40,5 @@ typedef struct _Batch Batch;
 typedef struct _Command Command;
 typedef struct _Connection Connection;
 typedef struct _Reply Reply;
-typedef struct _Executor Executor;
 
 #endif

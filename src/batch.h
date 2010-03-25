@@ -5,10 +5,7 @@
 #include "command.h"
 #include "reply.h"
 #include "buffer.h"
-#include "list.h"
 
-Batch *Batch_new();
-void Batch_free(Batch *batch);
 void Batch_free_final();
 
 //commands
@@ -25,7 +22,5 @@ Reply *Batch_pop_reply(Batch *batch);
 //buffers (private interface to connection)
 Buffer *Batch_read_buffer(Batch *batch);
 Buffer *Batch_write_buffer(Batch *batch);
-
-void Batch_list_add(Batch *batch, struct list_head *head);
 
 #endif
