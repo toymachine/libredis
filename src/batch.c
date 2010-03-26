@@ -12,25 +12,30 @@ struct _Batch
 {
 	struct list_head list; //for creating lists of batches
 
-	struct list_head cmd_queue; //commands queued for writing
+//	struct list_head cmd_queue; //commands queued for writing
+	int commands;
 	struct list_head reply_queue; //finished commands that have replies set
 
 	Buffer *write_buffer;
 	Buffer *read_buffer;
+
+	struct list_head *current; //reply iterator
 };
 
+/*
 struct _Command
 {
 	struct list_head list;
-	Reply *reply;
+//	Reply *reply;
 };
+*/
 
 struct _Reply
 {
 	struct list_head list;
 
 	ReplyType type;
-	Command *cmd;
+//	Command *cmd;
 
 	Byte *data;
 	size_t offset;
@@ -50,7 +55,7 @@ Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len)
 	reply->data = data;
 	reply->offset = offset;
 	reply->len = len;
-	reply->cmd = NULL;
+	//reply->cmd = NULL;
 	INIT_LIST_HEAD(&reply->children);
 	reply->current = &reply->children;
 	return reply;
@@ -63,9 +68,9 @@ void _Reply_free(Reply *reply, int final)
 			Reply *child = list_pop_T(Reply, list, &reply->children);
 			Reply_free(child);
 		}
-		if(reply->cmd) {
-			Command_free(reply->cmd);
-		}
+//		if(reply->cmd) {
+//			Command_free(reply->cmd);
+//		}
 	}
 	Reply_list_free(reply, final);
 }
@@ -103,14 +108,14 @@ ReplyType Reply_type(Reply *reply)
 }
 
 int Reply_dump(Reply *reply) {
-	ReplyType reply_type = Reply_type(reply);
+	ReplyType reply_type = reply->type;
 	switch(reply_type) {
 	case RT_OK: {
-		printf("ok reply: %.*s\n", Reply_length(reply), Reply_data(reply));
+		printf("ok reply: %.*s\n", reply->len, Reply_data(reply));
 		break;
 	}
 	case RT_BULK: {
-		printf("bulk reply: %.*s\n", Reply_length(reply), Reply_data(reply));
+		printf("bulk reply: %.*s\n", reply->len, Reply_data(reply));
 		break;
 	}
 	case RT_BULK_NIL: {
@@ -118,13 +123,13 @@ int Reply_dump(Reply *reply) {
 		break;
 	}
 	case RT_MULTIBULK: {
-		printf("multi bulk reply, count: %d\n", Reply_length(reply));
+		printf("multi bulk reply, count: %d\n", reply->len);
 		Reply *child;
 		list_for_each_entry(child, &reply->children, list) {
 			assert(child != NULL);
-			ReplyType child_type = Reply_type(child);
+			ReplyType child_type = child->type;
 			if(RT_BULK == child_type) {
-				printf("\tbulk reply: %.*s\n", Reply_length(child), Reply_data(child));
+				printf("\tbulk reply: %.*s\n", child->len, Reply_data(child));
 			}
 			else if(RT_BULK_NIL == child_type) {
 				printf("\tbulk nil\n");
@@ -141,13 +146,14 @@ int Reply_dump(Reply *reply) {
 	return 0;
 }
 
+/*
 ALLOC_LIST_T(Command, list)
 
 Command *Command_new()
 {
 	Command *command;
 	Command_list_alloc(&command);
-	command->reply = NULL;
+//	command->reply = NULL;
 	return command;
 }
 
@@ -155,6 +161,7 @@ void _Command_free(Command *command, int final)
 {
 	Command_list_free(command, final);
 }
+*/
 
 ALLOC_LIST_T(Batch, list)
 
@@ -169,19 +176,23 @@ Batch *Batch_new()
 		Buffer_clear(batch->read_buffer);
 		Buffer_clear(batch->write_buffer);
 	}
-	INIT_LIST_HEAD(&batch->cmd_queue);
+//	INIT_LIST_HEAD(&batch->cmd_queue);
+	batch->commands = 0;
 	INIT_LIST_HEAD(&batch->reply_queue);
+	batch->current = &batch->reply_queue;
 	return batch;
 }
 
 void _Batch_free(Batch *batch, int final)
 {
-	while(Batch_has_command(batch)) {
-		Command *command = Batch_next_command(batch);
-		Command_free(command);
+//	while(Batch_has_command(batch)) {
+//		Command *command = Batch_next_command(batch);
+//		Command_free(command);
+//	}
+	while(!list_empty(&batch->reply_queue)) {
+		Reply *reply = list_pop_T(Reply, list, &batch->reply_queue);
+		Reply_free(reply);
 	}
-	//TODO free replies:
-	assert(list_empty(&batch->reply_queue));
 	if(final) {
 		Buffer_free(batch->read_buffer);
 		Buffer_free(batch->write_buffer);
@@ -212,15 +223,17 @@ void Batch_write(Batch *batch, const char *str, size_t str_len)
 
 void Batch_add_command(Batch *batch)
 {
-	Command *cmd = Command_new();
-	list_add(&(cmd->list), &(batch->cmd_queue));
+//	Command *cmd = Command_new();
+//	list_add(&(cmd->list), &(batch->cmd_queue));
+	batch->commands += 1;
 }
 
 int Batch_has_command(Batch *batch)
 {
-	return !list_empty(&batch->cmd_queue);
+	return batch->commands > 0;
 }
 
+/*
 Command *Batch_next_command(Batch *batch)
 {
 	if(Batch_has_command(batch)) {
@@ -230,33 +243,38 @@ Command *Batch_next_command(Batch *batch)
 		return NULL;
 	}
 }
+*/
 
 void Batch_add_reply(Batch *batch, Reply *reply)
 {
 	DEBUG(("pop cmd from command queue\n"));
-	Command *cmd = list_pop_T(Command, list, &batch->cmd_queue);
-	cmd->reply = reply;
-	reply->cmd = cmd;
+//	Command *cmd = list_pop_T(Command, list, &batch->cmd_queue);
+//	cmd->reply = reply;
+//	reply->cmd = cmd;
 	DEBUG(("add reply/cmd back to reply queue\n"));
-	list_add(&cmd->list, &batch->reply_queue);
+	batch->commands -= 1;
+	list_add(&reply->list, &batch->reply_queue);
 }
 
 
-int Batch_has_reply(Batch *batch)
+int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *len)
 {
-	return !list_empty(&batch->reply_queue);
-}
-
-Reply *Batch_pop_reply(Batch *batch)
-{
-	if(Batch_has_reply(batch)) {
-		Command *cmd = list_pop_T(Command, list, &batch->reply_queue);
-		return cmd->reply;
+	batch->current = batch->current->next;
+	if(batch->current == &batch->reply_queue) {
+		*reply_type = RT_NONE;
+		*data = NULL;
+		*len = 0;
+		return 0;
 	}
 	else {
-		return NULL;
+		Reply *current = list_entry(batch->current, Reply, list);
+		*reply_type = current->type;
+		*data = Reply_data(current);
+		*len = current->len;
+		return 1;
 	}
 }
+
 
 Buffer *Batch_read_buffer(Batch *batch)
 {

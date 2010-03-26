@@ -45,6 +45,47 @@ class ConnectionManager(object):
             self._connections[addr] = Connection(addr)
         return self._connections[addr]
         
+#===============================================================================
+# class Reply(object):
+#    RT_OK = 1
+#    RT_ERROR = 2
+#    RT_BULK_NIL = 3
+#    RT_BULK = 4
+#    RT_MULTIBULK_NIL = 5
+#    RT_MULTIBULK = 6
+#    
+#    def __init__(self, reply):
+#        self._reply = reply
+# 
+#    @property
+#    def type(self):
+#        return libredis.Reply_type(self._reply)
+# 
+#    def has_child(self):
+#        return bool(libredis.Reply_has_child(self._reply))
+# 
+#    def pop_child(self):
+#        return Reply(libredis.Reply_pop_child(self._reply))
+#    
+#    def dump(self):
+#        libredis.Reply_dump(self._reply)
+# 
+#    def free(self):
+#        libredis.Reply_free(self._reply)
+#        self._reply = None
+# 
+#    def __del__(self):
+#        if self._reply is not None:
+#            self.free()
+# 
+#    @property
+#    def value(self):
+#        if self.type in [self.RT_BULK_NIL, self.RT_MULTIBULK_NIL]:
+#            return None
+#        else:
+#            return string_at(libredis.Reply_data(self._reply), libredis.Reply_length(self._reply))
+#===============================================================================
+
 class Reply(object):
     RT_OK = 1
     RT_ERROR = 2
@@ -52,37 +93,24 @@ class Reply(object):
     RT_BULK = 4
     RT_MULTIBULK_NIL = 5
     RT_MULTIBULK = 6
-    
-    def __init__(self, reply):
-        self._reply = reply
 
-    @property
-    def type(self):
-        return libredis.Reply_type(self._reply)
-
-    def has_child(self):
-        return bool(libredis.Reply_has_child(self._reply))
-
-    def pop_child(self):
-        return Reply(libredis.Reply_pop_child(self._reply))
-    
-    def dump(self):
-        libredis.Reply_dump(self._reply)
-
-    def free(self):
-        libredis.Reply_free(self._reply)
-        self._reply = None
-
-    def __del__(self):
-        if self._reply is not None:
-            self.free()
-
-    @property
-    def value(self):
-        if self.type in [self.RT_BULK_NIL, self.RT_MULTIBULK_NIL]:
-            return None
+    def __init__(self, type, value):
+        self.type = type
+        self.value = value
+        
+    @classmethod
+    def from_next(cls, batch):
+        data = c_char_p()
+        rt = c_int()
+        len = c_int()
+        libredis.Batch_next_reply(batch._batch, byref(rt),byref(data), byref(len))
+        type = rt.value
+        if type in [cls.RT_OK, cls.RT_ERROR, cls.RT_BULK]:
+            value = string_at(data, len)
         else:
-            return string_at(libredis.Reply_data(self._reply), libredis.Reply_length(self._reply))
+            assert False
+        return Reply(type, value)
+            
 
 class Buffer(object):
     def __init__(self, buffer):
@@ -101,11 +129,8 @@ class Batch(object):
     def add_command(self):
         libredis.Batch_add_command(self._batch)
     
-    def has_reply(self):
-        return bool(libredis.Batch_has_reply(self._batch))
-
-    def pop_reply(self):
-        return Reply(libredis.Batch_pop_reply(self._batch))
+    def next_reply(self):
+        return Reply.from_next(self)
 
     @property
     def write_buffer(self):
@@ -159,7 +184,7 @@ class Redis(object):
         server_addr = self.server_hash.get_server_addr(self.server_hash.get_server(key))
         connection = self.connection_manager.get_connection(server_addr)
         connection.execute(batch)
-        return batch.pop_reply()
+        return batch.next_reply()
         
     def set(self, key, value):
         batch = Batch()
@@ -169,6 +194,7 @@ class Redis(object):
     def get(self, key):
         batch = Batch()
         reply = self._execute_simple(batch, key, "GET %s\r\n", key)
+        print 'repl', reply.type, reply.value
         return reply.value
     
     def mget(self, *keys):
@@ -196,7 +222,10 @@ class Redis(object):
         results = {}
         for batch in batches.values():
             #only expect 1 (multibulk) reply per batch
-            reply = batch.pop_reply()
+            print 'befor next rp'
+            reply = batch.next_reply()
+            print 'after next rp'
+            #assert reply.is_multibulk()
             for key in batch.keys:
                 child = reply.pop_child()
                 value = child.value

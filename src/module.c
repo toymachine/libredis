@@ -22,6 +22,6 @@ void Module_free()
 	DEBUG(("Module free\n"));
 	//release the freelists
 	Reply_free_final();
-	Command_free_final();
+//	Command_free_final();
 	Batch_free_final();
 }

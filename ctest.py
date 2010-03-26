@@ -68,6 +68,7 @@ def test_mget():
     keys = ['piet%d' % i for i in range(N)]
 
     for i in range(N):
+        print '****************', i
         redis.set('piet%d' % i, 'blaat%d' % i)
         assert(redis.get('piet%d' % i) == 'blaat%d' % i)
         #print '******', repr(redis.get('piet%d' % i))

@@ -9,6 +9,17 @@ typedef struct _Batch Batch;
 typedef struct _Connection Connection;
 typedef struct _Ketama Ketama;
 
+typedef enum _ReplyType
+{
+	RT_NONE = 0,
+    RT_OK = 1,
+	RT_ERROR = 2,
+    RT_BULK_NIL = 3,
+    RT_BULK = 4,
+    RT_MULTIBULK_NIL = 5,
+    RT_MULTIBULK = 6
+} ReplyType;
+
 Connection *Connection_new(const char *addr);
 void Connection_free(Connection *connection);
 int Connection_execute(Connection *connection, Batch *batch);
@@ -18,6 +29,9 @@ void Batch_free(Batch *batch);
 void Batch_write(Batch *batch, const char *str, size_t str_len);
 void Batch_writef(Batch *batch, const char *format, ...);
 void Batch_add_command(Batch *batch);
+
+//reading out replies
+int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *len);
 
 Ketama *Ketama_new();
 void Ketama_free(Ketama *ketama);

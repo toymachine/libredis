@@ -15,8 +15,6 @@ Command *Batch_next_command(Batch *batch);
 
 //replies
 void Batch_add_reply(Batch *batch, Reply *reply);
-int Batch_has_reply(Batch *batch);
-Reply *Batch_pop_reply(Batch *batch);
 
 //buffers (private interface to connection)
 Buffer *Batch_read_buffer(Batch *batch);
