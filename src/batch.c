@@ -269,7 +269,21 @@ int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *l
 	else {
 		Reply *current = list_entry(batch->current, Reply, list);
 		*reply_type = current->type;
-		*data = Reply_data(current);
+//		RT_NONE = 0,
+//	    RT_OK = 1,
+//		RT_ERROR = 2,
+//	    RT_BULK_NIL = 3,
+//	    RT_BULK = 4,
+//	    RT_MULTIBULK_NIL = 5,
+//	    RT_MULTIBULK = 6
+		if(current->type == RT_OK ||
+		   current->type == RT_ERROR ||
+		   current->type == RT_BULK) {
+			*data = Reply_data(current);
+		}
+		else {
+			*data = NULL;
+		}
 		*len = current->len;
 		return 1;
 	}

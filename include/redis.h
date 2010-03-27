@@ -33,6 +33,7 @@ void Batch_add_command(Batch *batch);
 //reading out replies
 int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *len);
 
+//ketama hashing
 Ketama *Ketama_new();
 void Ketama_free(Ketama *ketama);
 void Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long weight);

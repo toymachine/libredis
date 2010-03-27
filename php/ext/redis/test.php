@@ -31,16 +31,16 @@ function test_connection() {
 	
 	Redis_dispatch();
 	
-/*
-        self.execute(batch)
-        reply = batch.pop_reply()
-        return reply.value
-*/
-
+	$res = $batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
+	
+	echo $reply_type, PHP_EOL;
+	echo $reply_value, PHP_EOL;
+	echo $reply_length, PHP_EOL;
+	echo $res, PHP_EOL;
 }
 
-//test_ketama();
-test_connection();
+test_ketama();
+//test_connection();
 
 echo "done...!", PHP_EOL;
 ?>

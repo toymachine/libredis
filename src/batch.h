@@ -11,7 +11,7 @@ void Batch_free_final();
 
 //commands
 int Batch_has_command(Batch *batch);
-Command *Batch_next_command(Batch *batch);
+//Command *Batch_next_command(Batch *batch);
 
 //replies
 void Batch_add_reply(Batch *batch, Reply *reply);

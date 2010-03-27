@@ -98,6 +98,9 @@ class Reply(object):
         self.type = type
         self.value = value
         
+    def is_multibulk(self):
+        return self.type == self.RT_MULTIBULK
+    
     @classmethod
     def from_next(cls, batch):
         data = c_char_p()
@@ -107,6 +110,8 @@ class Reply(object):
         type = rt.value
         if type in [cls.RT_OK, cls.RT_ERROR, cls.RT_BULK]:
             value = string_at(data, len)
+        elif type in [cls.RT_MULTIBULK]:
+            value = len
         else:
             assert False
         return Reply(type, value)
@@ -194,7 +199,6 @@ class Redis(object):
     def get(self, key):
         batch = Batch()
         reply = self._execute_simple(batch, key, "GET %s\r\n", key)
-        print 'repl', reply.type, reply.value
         return reply.value
     
     def mget(self, *keys):
@@ -225,7 +229,7 @@ class Redis(object):
             print 'befor next rp'
             reply = batch.next_reply()
             print 'after next rp'
-            #assert reply.is_multibulk()
+            assert reply.is_multibulk()
             for key in batch.keys:
                 child = reply.pop_child()
                 value = child.value

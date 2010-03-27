@@ -3,6 +3,7 @@
 #endif
 
 #include "php.h"
+#include "zend.h"
 #include "php_redis.h"
 
 #include "redis.h"
@@ -15,6 +16,8 @@ zend_class_entry *batch_ce;
 zend_class_entry *ketama_ce;
 zend_class_entry *connection_ce;
 
+
+//TODO use read-only zend_get_parameters_ex where possible
 
 /**************** KETAMA ***********************/
 
@@ -165,11 +168,56 @@ PHP_METHOD(Batch, add_command)
 	Batch_add_command(Batch_getThis());
 }
 
+PHP_METHOD(Batch, next_reply)
+{
+	zval *reply_type;
+	zval *reply_value;
+	zval *reply_length;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "zzz", &reply_type, &reply_value, &reply_length) == FAILURE) {
+		RETURN_NULL();
+	}
+
+	if (!PZVAL_IS_REF(reply_type))
+	{
+	   zend_error(E_WARNING, "Parameter wasn't passed by reference (reply_type)");
+	   RETURN_NULL();
+	}
+	if (!PZVAL_IS_REF(reply_value))
+	{
+	    zend_error(E_WARNING, "Parameter wasn't passed by reference (reply_value)");
+	    RETURN_NULL();
+	}
+	if (!PZVAL_IS_REF(reply_length))
+	{
+	    zend_error(E_WARNING, "Parameter wasn't passed by reference (reply_length)");
+	    RETURN_NULL();
+	}
+
+	ReplyType c_reply_type;
+	char *c_reply_value;
+	size_t c_reply_length;
+
+	int res = Batch_next_reply(Batch_getThis(), &c_reply_type, &c_reply_value, &c_reply_length);
+
+	ZVAL_LONG(reply_type, c_reply_type);
+	if(c_reply_value != NULL) {
+		ZVAL_STRINGL(reply_value, c_reply_value, c_reply_length, 1);
+	}
+	else {
+		ZVAL_EMPTY_STRING(reply_value);
+	}
+	ZVAL_LONG(reply_length, c_reply_length);
+
+	RETURN_BOOL(res);
+}
+
 function_entry batch_methods[] = {
     PHP_ME(Batch,  __construct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR)
     PHP_ME(Batch,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
     PHP_ME(Batch,  write,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Batch,  add_command,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Batch,  next_reply,           NULL, ZEND_ACC_PUBLIC)
     {NULL, NULL, NULL}
 };
 
