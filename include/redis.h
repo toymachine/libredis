@@ -28,7 +28,7 @@ Batch *Batch_new();
 void Batch_free(Batch *batch);
 void Batch_write(Batch *batch, const char *str, size_t str_len);
 void Batch_writef(Batch *batch, const char *format, ...);
-void Batch_add_command(Batch *batch);
+void Batch_finalize(Batch *batch, int num_commands);
 
 //reading out replies
 int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *len);

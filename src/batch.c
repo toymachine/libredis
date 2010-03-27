@@ -4,7 +4,6 @@
 #include "common.h"
 #include "batch.h"
 #include "list.h"
-#include "command.h"
 #include "reply.h"
 #include "connection.h"
 
@@ -12,7 +11,6 @@ struct _Batch
 {
 	struct list_head list; //for creating lists of batches
 
-//	struct list_head cmd_queue; //commands queued for writing
 	int commands;
 	struct list_head reply_queue; //finished commands that have replies set
 
@@ -22,20 +20,11 @@ struct _Batch
 	struct list_head *current; //reply iterator
 };
 
-/*
-struct _Command
-{
-	struct list_head list;
-//	Reply *reply;
-};
-*/
-
 struct _Reply
 {
 	struct list_head list;
 
 	ReplyType type;
-//	Command *cmd;
 
 	Byte *data;
 	size_t offset;
@@ -55,7 +44,6 @@ Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len)
 	reply->data = data;
 	reply->offset = offset;
 	reply->len = len;
-	//reply->cmd = NULL;
 	INIT_LIST_HEAD(&reply->children);
 	reply->current = &reply->children;
 	return reply;
@@ -68,9 +56,6 @@ void _Reply_free(Reply *reply, int final)
 			Reply *child = list_pop_T(Reply, list, &reply->children);
 			Reply_free(child);
 		}
-//		if(reply->cmd) {
-//			Command_free(reply->cmd);
-//		}
 	}
 	Reply_list_free(reply, final);
 }
@@ -146,23 +131,6 @@ int Reply_dump(Reply *reply) {
 	return 0;
 }
 
-/*
-ALLOC_LIST_T(Command, list)
-
-Command *Command_new()
-{
-	Command *command;
-	Command_list_alloc(&command);
-//	command->reply = NULL;
-	return command;
-}
-
-void _Command_free(Command *command, int final)
-{
-	Command_list_free(command, final);
-}
-*/
-
 ALLOC_LIST_T(Batch, list)
 
 Batch *Batch_new()
@@ -176,7 +144,6 @@ Batch *Batch_new()
 		Buffer_clear(batch->read_buffer);
 		Buffer_clear(batch->write_buffer);
 	}
-//	INIT_LIST_HEAD(&batch->cmd_queue);
 	batch->commands = 0;
 	INIT_LIST_HEAD(&batch->reply_queue);
 	batch->current = &batch->reply_queue;
@@ -221,11 +188,9 @@ void Batch_write(Batch *batch, const char *str, size_t str_len)
 	Buffer_printf(batch->write_buffer, "%.*s", str_len, str);
 }
 
-void Batch_add_command(Batch *batch)
+void Batch_finalize(Batch *batch, int num_commands)
 {
-//	Command *cmd = Command_new();
-//	list_add(&(cmd->list), &(batch->cmd_queue));
-	batch->commands += 1;
+	batch->commands = num_commands;
 }
 
 int Batch_has_command(Batch *batch)
@@ -233,24 +198,10 @@ int Batch_has_command(Batch *batch)
 	return batch->commands > 0;
 }
 
-/*
-Command *Batch_next_command(Batch *batch)
-{
-	if(Batch_has_command(batch)) {
-		return list_pop_T(Command, list, &batch->cmd_queue);
-	}
-	else {
-		return NULL;
-	}
-}
-*/
 
 void Batch_add_reply(Batch *batch, Reply *reply)
 {
 	DEBUG(("pop cmd from command queue\n"));
-//	Command *cmd = list_pop_T(Command, list, &batch->cmd_queue);
-//	cmd->reply = reply;
-//	reply->cmd = cmd;
 	DEBUG(("add reply/cmd back to reply queue\n"));
 	batch->commands -= 1;
 	list_add(&reply->list, &batch->reply_queue);
@@ -299,11 +250,4 @@ Buffer *Batch_write_buffer(Batch *batch)
 {
 	return batch->write_buffer;
 }
-
-void Batch_list_add(Batch *batch, struct list_head *head)
-{
-	list_add(&batch->list, head);
-}
-
-
 

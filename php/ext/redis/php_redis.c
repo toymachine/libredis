@@ -163,9 +163,15 @@ PHP_METHOD(Batch, write)
 	Batch_write(Batch_getThis(), str, str_len);
 }
 
-PHP_METHOD(Batch, add_command)
+PHP_METHOD(Batch, finalize)
 {
-	Batch_add_command(Batch_getThis());
+	long num_commands;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "l", &num_commands) == FAILURE) {
+		RETURN_NULL();
+	}
+
+	Batch_finalize(Batch_getThis(), num_commands);
 }
 
 PHP_METHOD(Batch, next_reply)
@@ -216,7 +222,7 @@ function_entry batch_methods[] = {
     PHP_ME(Batch,  __construct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR)
     PHP_ME(Batch,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
     PHP_ME(Batch,  write,           NULL, ZEND_ACC_PUBLIC)
-    PHP_ME(Batch,  add_command,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Batch,  finalize,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Batch,  next_reply,           NULL, ZEND_ACC_PUBLIC)
     {NULL, NULL, NULL}
 };

@@ -1,7 +1,6 @@
 #include "module.h"
 #include "event.h"
 #include "reply.h"
-#include "command.h"
 #include "batch.h"
 
 void Module_init()

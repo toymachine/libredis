@@ -25,7 +25,7 @@ function test_connection() {
 	$batch = new Redis_Batch();
 	$key = "piet";
     $batch->write("GET $key\r\n");	
-	$batch->add_command();
+	$batch->finalize(1);
 	
 	$connection->execute($batch);
 	

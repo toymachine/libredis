@@ -14,7 +14,6 @@
 #include "common.h"
 #include "buffer.h"
 #include "connection.h"
-#include "command.h"
 #include "reply.h"
 #include "parser.h"
 #include "batch.h"
