@@ -17,7 +17,8 @@ typedef enum _ReplyType
     RT_BULK_NIL = 3,
     RT_BULK = 4,
     RT_MULTIBULK_NIL = 5,
-    RT_MULTIBULK = 6
+    RT_MULTIBULK = 6,
+    RT_INTEGER = 7
 } ReplyType;
 
 Connection *Connection_new(const char *addr);

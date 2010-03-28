@@ -1,5 +1,8 @@
 - php module shutdown not done?, why not, debug show sighup or something
-- buffer grow stuff, 
+- php persistent connections/ketama's
+- php alloc
+
+- buffer grow stuff / vsprint last 0 stuff
 - socket creation errors
 - connection timeout
 - connection (re) connect and errors
@@ -10,5 +13,3 @@
 - other read and write errors
 
 
-- factor out event loop
-- vsprint last 0 stuff

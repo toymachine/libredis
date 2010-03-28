@@ -7,12 +7,9 @@ typedef struct _ReplyParser ReplyParser;
 
 typedef enum _ReplyParserResult
 {
-	RPR_NONE = 0,
-    RPR_DONE = 1,
-    RPR_ERROR = 2,
-    RPR_MORE = 3,
-    RPR_REPLY = 4
-
+    RPR_ERROR = 0,
+    RPR_MORE = 1,
+    RPR_REPLY = 2
 } ReplyParserResult;
 
 ReplyParser *ReplyParser_new();

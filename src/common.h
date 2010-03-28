@@ -27,15 +27,6 @@ typedef char Byte;
 
 #include "alloc.h"
 
-typedef int (*hashmethodfunc)(void *instance, char *key, size_t key_len);
-
-typedef struct _HashMethodDelegate
-{
-	void *instance;
-	int max_ordinal;
-	hashmethodfunc func;
-} HashMethodDelegate;
-
 typedef struct _Command Command;
 typedef struct _Reply Reply;
 

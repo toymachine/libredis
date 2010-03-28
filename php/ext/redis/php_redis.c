@@ -2,6 +2,8 @@
 #include "config.h"
 #endif
 
+#include <stdlib.h>
+
 #include "php.h"
 #include "zend.h"
 #include "php_redis.h"
@@ -216,6 +218,7 @@ PHP_METHOD(Batch, next_reply)
     RT_BULK = 4,
     RT_MULTIBULK_NIL = 5,
     RT_MULTIBULK = 6
+    RT_INTEGER = 7
 	*/
 
     if(c_reply_type == RT_OK ||
@@ -227,6 +230,11 @@ PHP_METHOD(Batch, next_reply)
 		else {
 			ZVAL_EMPTY_STRING(reply_value);
 		}
+    }
+    else if(c_reply_type == RT_INTEGER) {
+    	char *end_value = c_reply_value + c_reply_length;
+    	//ZVAL_STRINGL(reply_value, c_reply_value, c_reply_length, 1);
+    	ZVAL_LONG(reply_value, strtol(c_reply_value, &end_value, 10));
     }
     else {
     	ZVAL_NULL(reply_value);
@@ -276,7 +284,6 @@ PHP_MINIT_FUNCTION(redis)
 
 PHP_MSHUTDOWN_FUNCTION(redis)
 {
-	//printf("shutdowns!!!\n");
 	Module_free();
 
 	return SUCCESS;

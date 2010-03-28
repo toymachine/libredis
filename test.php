@@ -113,9 +113,28 @@ function test_simple() {
 	}
 }
 
+function test_integer_reply()
+{
+	$batch = new Redis_Batch();
+    $batch->write("INCR incr_test\r\n");	
+    $batch->finalize(1);
+	$connection = new Redis_Connection("127.0.0.1:6379");
+	$connection->execute($batch);
+	Redis_dispatch();
+	while($level = $batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
+		echo "start", PHP_EOL;
+		echo "\ttype ", $reply_type, PHP_EOL;
+		echo "\tval ", $reply_value, " (", gettype($reply_value), ")", PHP_EOL;
+		echo "\tlen ", $reply_length, PHP_EOL;
+		echo "\tlevel ", $level, PHP_EOL;
+		echo "end", PHP_EOL;
+	}
+}
+
 //test_ketama();
 //test_simple();
-test_mget();
+//test_mget();
+test_integer_reply();
 
 echo "done...!", PHP_EOL;
 ?>

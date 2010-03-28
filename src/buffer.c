@@ -37,8 +37,7 @@ Buffer *Buffer_new(size_t size)
 
 void Buffer_fill(Buffer *buffer, Byte b)
 {
-	int i;
-	for(i = 0; i < buffer->capacity; i++) {
+	for(int i = 0; i < buffer->capacity; i++) {
 		buffer->buff[i] = b;
 	}
 }

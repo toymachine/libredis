@@ -61,7 +61,6 @@ struct _Ketama
     unsigned long memory;
     mcs* continuum; //array of mcs structs
     serverinfo *servers; //array of numservers serverinfo structs
-    HashMethodDelegate hmd;
 };
 
 typedef int (*compfn)( const void*, const void* );
@@ -191,14 +190,6 @@ int Ketama_get_server(Ketama *ketama, char* key, size_t key_len)
             return mcsarr[0].ordinal;
         }
     }
-}
-
-HashMethodDelegate *Ketama_get_hash_method(Ketama *ketama)
-{
-	ketama->hmd.instance = ketama;
-	ketama->hmd.func = (hashmethodfunc)Ketama_get_server;
-	ketama->hmd.max_ordinal = ketama->numservers;
-	return &ketama->hmd;
 }
 
 

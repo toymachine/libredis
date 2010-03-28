@@ -50,6 +50,28 @@ int ReplyParser_free(ReplyParser *rp)
 }
 
 
+/**
+ * A State machine for parsing Redis replies.
+ * State is kept in the ReplyParser instance rp. The execute method can be called over and over
+ * again parsing evermore Replies from the given buffer.
+ * The method returns with RPR_ERROR if there is an error in the stream,
+ * RPR_MORE if it is not in an end-state, but the buffer ran out, indicating that more
+ * data needs to be read.
+ * Finally it returns RPR_REPLY everytime a valid Redis reply is parsed from the buffer, returning an instance
+ * of Reply in the 'reply' out parameter.
+ * 0 is the initial state, and after reading a valid reply, the machine will return to this state, ready to parse
+ * a new reply.
+ * states: 0->1->2 => single line positive reply (+OK\r\n)
+ * 		   0->3->4 => single line negative reply (-Some error msg\r\n)
+ * 	       0->5->6->7->8 => nil bulk reply ($-1\r\n)
+ * 		   0->5->9->10->11->12 => bulk reply ($5\r\nblaat\r\n)
+ * 		   0->13->14->15->16 => nil multibulk reply (*-1\r\n)
+ * 		   0->13->17->18 => multibulk reply (*3\r\n (... bulk replies ...)
+ * 		   0->?/  => integer reply (:42\r\n)
+ * Note that it is not a 'pure' state machine (from a language theory perspective), e.g. some additional state is kept to
+ * keep track of the number of chars to still read in a bulk reply, and some state to keep track of bulk replies that
+ * belong to a multibulk reply.
+ */
 ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len, Reply **reply)
 {    
 	DEBUG(("enter rp exec, rp->p: %d, len: %d, cs: %d\n", rp->p, len, rp->cs));
@@ -59,31 +81,40 @@ ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len,
     	Byte c = buffer[rp->p];
         //printf("cs: %d, char: %d\n", rp->cs, c);
         switch(rp->cs) {
-            case 0: {
-                if(c == '$') {
+            case 0: { //initial state
+                if(c == '$') { //possible start of bulk-reply
                     rp->p++;
                     rp->cs = 5;
                     continue;
                 }
                 else if(rp->multibulk_count == 0) { 
-                    //if we are still reading a multibulk reply, we will never go here 
-                    //(e.g. we only allow bulk replies within a multibulk reply)                    
+                	//the replies below only match when we are NOT in a multibulk reply.
                     if(c == '+') {
+                    	//possible start of positive single line server reply (e.g. +OK\r\n)
                         rp->p++;
                         rp->cs = 1;
                         MARK;
                         continue;
                     }
-                    else if(c == '-') {
-                        rp->p++;
+                    else if(c == '-') { //negative
+                    	//possible start of negative single line server reply (e.g. -Some error message\r\n)
+                    	rp->p++;
                         rp->cs = 3;
                         MARK;
                         continue;
                     }
                     else if(c == '*') {
+                    	//possible start of multibulk reply
                         rp->p++;
                         rp->cs = 13;
                         continue;
+                    }
+                    else if(c == ':') {
+                    	//possible start of integer reply
+                    	rp->p++;
+                    	rp->cs = 19;
+                    	MARK;
+                    	continue;
                     }
                 }
                 break; 
@@ -322,7 +353,29 @@ ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len,
                 }
                 break;
             }
-
+			//integer reply
+            case 19: {
+                if(c == CR) {
+                    rp->p++;
+                    rp->cs = 20;
+                    continue;
+                }
+                else {
+                    rp->p++;
+                    continue;
+                }
+                break;
+            }
+            case 20: {
+                if(c == LF) {
+                    rp->p++;
+                    rp->cs = 0;
+                    //report integer data
+                    *reply = Reply_new(RT_INTEGER, buffer, rp->mark, rp->p - rp->mark - 2);
+                    return RPR_REPLY;
+                }
+                break;
+            }
         }
         return RPR_ERROR;
     }
