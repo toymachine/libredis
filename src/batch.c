@@ -19,6 +19,7 @@ struct _Batch
 	Buffer *write_buffer;
 	Buffer *read_buffer;
 
+	//simple stack for iterating results
 	int current_reply_sp;
 	struct list_head *current_reply[BATCH_REPLY_ITERATOR_STACK_SIZE * 2];
 };
@@ -63,7 +64,7 @@ void _Reply_free(Reply *reply, int final)
 
 int Reply_add_child(Reply *reply, Reply *child)
 {
-	list_add(&child->list, &reply->children);
+	list_add_tail(&child->list, &reply->children);
 	return 0;
 }
 
@@ -156,10 +157,6 @@ Batch *Batch_new()
 
 void _Batch_free(Batch *batch, int final)
 {
-//	while(Batch_has_command(batch)) {
-//		Command *command = Batch_next_command(batch);
-//		Command_free(command);
-//	}
 	while(!list_empty(&batch->reply_queue)) {
 		Reply *reply = list_pop_T(Reply, list, &batch->reply_queue);
 		Reply_free(reply);

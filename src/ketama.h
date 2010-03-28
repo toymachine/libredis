@@ -35,7 +35,7 @@
 #include "common.h"
 
 HashMethodDelegate *Ketama_get_hash_method(Ketama *ketama);
-
+void Ketama_print_continuum(Ketama *ketama);
 
 #endif
 

@@ -207,12 +207,31 @@ PHP_METHOD(Batch, next_reply)
 	int res = Batch_next_reply(Batch_getThis(), &c_reply_type, &c_reply_value, &c_reply_length);
 
 	ZVAL_LONG(reply_type, c_reply_type);
-	if(c_reply_value != NULL) {
-		ZVAL_STRINGL(reply_value, c_reply_value, c_reply_length, 1);
-	}
-	else {
-		ZVAL_EMPTY_STRING(reply_value);
-	}
+
+	/*
+	RT_NONE = 0,
+    RT_OK = 1,
+	RT_ERROR = 2,
+    RT_BULK_NIL = 3,
+    RT_BULK = 4,
+    RT_MULTIBULK_NIL = 5,
+    RT_MULTIBULK = 6
+	*/
+
+    if(c_reply_type == RT_OK ||
+       c_reply_type == RT_ERROR ||
+       c_reply_type == RT_BULK) {
+		if(c_reply_value != NULL && c_reply_length > 0) {
+			ZVAL_STRINGL(reply_value, c_reply_value, c_reply_length, 1);
+		}
+		else {
+			ZVAL_EMPTY_STRING(reply_value);
+		}
+    }
+    else {
+    	ZVAL_NULL(reply_value);
+    }
+
 	ZVAL_LONG(reply_length, c_reply_length);
 
 	RETURN_LONG(res);

@@ -1,14 +1,14 @@
+- php module shutdown not done?, why not, debug show sighup or something
 - buffer grow stuff, 
-- factor out event loop
-- vsprint last 0 stuff
-- executor/helper/ketama hashing
 - socket creation errors
 - connection timeout
-- remove executor
 - connection (re) connect and errors
 - connection reply parser error
 - connection read and write timeouts
 - reconnect when server disconnected (auto server disconnect)
 - read and write EOF
 - other read and write errors
-* final free, e.g. also free the freelists
+
+
+- factor out event loop
+- vsprint last 0 stuff

@@ -59,20 +59,16 @@ function mget($keys, $ketama) {
     //handle events until all complete
 	Redis_dispatch();
     //build up results
-    /*
-    results = {}
-    for batch in batches.values():
-        #only expect 1 (multibulk) reply per batch
-        print 'befor next rp'
-        reply = batch.next_reply()
-        print 'after next rp'
-        assert reply.is_multibulk()
-        for key in batch.keys:
-            child = reply.pop_child()
-            value = child.value
-            results[key] = value
-    return results
-    */
+    $results = array();
+    foreach($batches as $server_ordinal=>$batch) {
+    	//read multibulk reply
+	    $batch->next_reply(&$mb_reply_type, &$mb_reply_value, &$mb_reply_length);
+	    foreach($batch_keys[$server_ordinal] as $key) {
+    	    $batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
+    	    $results[$key] = $reply_value;
+		}
+	}
+	return $results;
 }
 
 function test_mget()
@@ -82,7 +78,7 @@ function test_mget()
     $ketama->add_server("127.0.0.1", 6380, 300);
     $ketama->create_continuum();
 
-	mget(array("piet1", "piet2", "piet3", "piet4"), $ketama);
+	print_r(mget(array("piet1", "piet2", "piet3", "piet4", "xx3"), $ketama));
 }
 
 function _test_simple($connection)
@@ -118,8 +114,8 @@ function test_simple() {
 }
 
 //test_ketama();
-test_simple();
-//test_mget();
+//test_simple();
+test_mget();
 
 echo "done...!", PHP_EOL;
 ?>
