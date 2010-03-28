@@ -120,7 +120,7 @@ PHP_METHOD(Connection, execute)
 	}
 
 	Batch *batch = T_fromObj(Batch, batch_ce, obj);
-	printf("conn exec batch %x\n", batch);
+	//printf("conn exec batch %x\n", batch);
 
 	Connection_execute(Connection_getThis(), batch);
 //	Batch_write(Batch_getThis(), str, str_len);
@@ -159,7 +159,7 @@ PHP_METHOD(Batch, write)
 		RETURN_NULL();
 	}
 
-	printf("batch wr on %x\n", Batch_getThis());
+	//printf("batch wr on %x\n", Batch_getThis());
 	Batch_write(Batch_getThis(), str, str_len);
 }
 
@@ -215,7 +215,7 @@ PHP_METHOD(Batch, next_reply)
 	}
 	ZVAL_LONG(reply_length, c_reply_length);
 
-	RETURN_BOOL(res);
+	RETURN_LONG(res);
 }
 
 function_entry batch_methods[] = {
@@ -257,7 +257,7 @@ PHP_MINIT_FUNCTION(redis)
 
 PHP_MSHUTDOWN_FUNCTION(redis)
 {
-	printf("shutdowns!!!\n");
+	//printf("shutdowns!!!\n");
 	Module_free();
 
 	return SUCCESS;

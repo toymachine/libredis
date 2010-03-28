@@ -7,6 +7,8 @@
 #include "reply.h"
 #include "connection.h"
 
+#define BATCH_REPLY_ITERATOR_STACK_SIZE 2
+
 struct _Batch
 {
 	struct list_head list; //for creating lists of batches
@@ -17,7 +19,8 @@ struct _Batch
 	Buffer *write_buffer;
 	Buffer *read_buffer;
 
-	struct list_head *current; //reply iterator
+	int current_reply_sp;
+	struct list_head *current_reply[BATCH_REPLY_ITERATOR_STACK_SIZE * 2];
 };
 
 struct _Reply
@@ -31,7 +34,6 @@ struct _Reply
 	size_t len;
 
 	struct list_head children;
-	struct list_head *current; //child iterator
 };
 
 ALLOC_LIST_T(Reply, list)
@@ -45,7 +47,6 @@ Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len)
 	reply->offset = offset;
 	reply->len = len;
 	INIT_LIST_HEAD(&reply->children);
-	reply->current = &reply->children;
 	return reply;
 }
 
@@ -146,7 +147,10 @@ Batch *Batch_new()
 	}
 	batch->commands = 0;
 	INIT_LIST_HEAD(&batch->reply_queue);
-	batch->current = &batch->reply_queue;
+
+	batch->current_reply_sp = 0;
+	batch->current_reply[0] = &batch->reply_queue;
+	batch->current_reply[1] = &batch->reply_queue;
 	return batch;
 }
 
@@ -210,16 +214,29 @@ void Batch_add_reply(Batch *batch, Reply *reply)
 
 int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *len)
 {
-	batch->current = batch->current->next;
-	if(batch->current == &batch->reply_queue) {
-		*reply_type = RT_NONE;
-		*data = NULL;
-		*len = 0;
-		return 0;
+	struct list_head *current = batch->current_reply[batch->current_reply_sp];
+	struct list_head *last = batch->current_reply[batch->current_reply_sp + 1];
+	current = current->next;
+	batch->current_reply[batch->current_reply_sp] = current;
+
+	if(current == last) {
+		if(batch->current_reply_sp > 0) {
+			batch->current_reply_sp -= 2;
+			assert(batch->current_reply_sp >= 0);
+			current = batch->current_reply[batch->current_reply_sp];
+			last = batch->current_reply[batch->current_reply_sp + 1];
+		}
+		else {
+			*reply_type = RT_NONE;
+			*data = NULL;
+			*len = 0;
+			return 0;
+		}
 	}
-	else {
-		Reply *current = list_entry(batch->current, Reply, list);
-		*reply_type = current->type;
+
+	int level = (batch->current_reply_sp / 2) + 1;
+	Reply *current_reply = list_entry(current, Reply, list);
+	*reply_type = current_reply->type;
 //		RT_NONE = 0,
 //	    RT_OK = 1,
 //		RT_ERROR = 2,
@@ -227,17 +244,24 @@ int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *l
 //	    RT_BULK = 4,
 //	    RT_MULTIBULK_NIL = 5,
 //	    RT_MULTIBULK = 6
-		if(current->type == RT_OK ||
-		   current->type == RT_ERROR ||
-		   current->type == RT_BULK) {
-			*data = Reply_data(current);
-		}
-		else {
-			*data = NULL;
-		}
-		*len = current->len;
-		return 1;
+	if(current_reply->type == RT_OK ||
+	   current_reply->type == RT_ERROR ||
+	   current_reply->type == RT_BULK) {
+		*data = Reply_data(current_reply);
 	}
+	else if(current_reply->type == RT_MULTIBULK) {
+		*data = NULL;
+		batch->current_reply[batch->current_reply_sp] = current->next;
+		batch->current_reply_sp += 2;
+		assert(batch->current_reply_sp <= (BATCH_REPLY_ITERATOR_STACK_SIZE * 2));
+		batch->current_reply[batch->current_reply_sp] = &current_reply->children;
+		batch->current_reply[batch->current_reply_sp + 1] = &current_reply->children;
+	}
+	else {
+		*data = NULL;
+	}
+	*len = current_reply->len;
+	return level;
 }
 
 
