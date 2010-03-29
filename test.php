@@ -35,8 +35,7 @@ function mget($keys, $ketama) {
     foreach($keys as $key) {
         $server_ordinal = $ketama->get_server($key);
         if(!isset($batches[$server_ordinal])) {
-            $batch = new Redis_Batch();
-            $batch->write("MGET");
+            $batch = new Redis_Batch("MGET");
             $batches[$server_ordinal] = $batch;
     	}
     	else {
@@ -47,8 +46,7 @@ function mget($keys, $ketama) {
     }
     //finalize batches, and start executing
     foreach($batches as $server_ordinal=>$batch) {
-        $batch->write("\r\n");
-        $batch->finalize(1);
+        $batch->write("\r\n", 1);
         $server_addr = $ketama->get_server_addr($server_ordinal);
 		if(!isset($connections[$server_addr])) {
 			$connections[$server_addr] = new Redis_Connection($server_addr);
@@ -78,38 +76,37 @@ function test_mget()
     $ketama->add_server("127.0.0.1", 6380, 300);
     $ketama->create_continuum();
 
-	print_r(mget(array("piet1", "piet2", "piet3", "piet4", "xx3"), $ketama));
+    $connection1 = new Redis_Connection("127.0.0.1:6379");
+    $connection2 = new Redis_Connection("127.0.0.1:6380");
+    for($i = 0; $i < 100; $i++) {
+        $key = "piet$i";
+        $value = "blaat$i";
+        $len = strlen($value);
+        $batch = new Redis_Batch("SET $key $len\r\n$value\r\n", 1);
+        $connection1->execute($batch, true);
+        $batch = new Redis_Batch("SET $key $len\r\n$value\r\n", 1);
+        $connection2->execute($batch, true);
+    }
+    
+    for($i = 0; $i < 100; $i++) {
+	   mget(array("piet1", "piet2", "piet3", "piet4", "xx3"), $ketama);
+    }
 }
 
-function _test_simple($connection)
+function _test_simple($connection, $key)
 {
-	$batch = new Redis_Batch();
-	$key = "piet";
-    $batch->write("GET $key\r\n");	
-    $batch->write("MGET $key $key\r\n");
-    $batch->write("GET $key\r\n");	
-	$batch->finalize(3);
-	
-	$connection->execute($batch);
-	
-	Redis_dispatch();
-	
-	while($level = $batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
-		echo "start", PHP_EOL;
-		echo "\ttype ", $reply_type, PHP_EOL;
-		echo "\tval ", $reply_value, PHP_EOL;
-		echo "\tlen ", $reply_length, PHP_EOL;
-		echo "\tlevel ", $level, PHP_EOL;
-		echo "end", PHP_EOL;
-	}
+	$batch = new Redis_Batch("GET $key\r\n", 1);
+	$connection->execute($batch, true);
+	$batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
+	return $reply_value;
 }
 
 function test_simple() {
 	
 	$connection = new Redis_Connection("127.0.0.1:6379");
 	
-	for($i = 0; $i < 1; $i++) {
-		_test_simple($connection);
+	for($i = 0; $i < 100; $i++) {
+		_test_simple($connection, "library");
 	}
 }
 
@@ -131,10 +128,13 @@ function test_integer_reply()
 	}
 }
 
+$batch = new Redis_Batch();
+for($i = 0; $i < 10000; $i++) {
+  $batch->write("INCR");  
+}
 //test_ketama();
 //test_simple();
 //test_mget();
-test_integer_reply();
-
-echo "done...!", PHP_EOL;
+//test_integer_reply();
+//echo "done...!", PHP_EOL;
 ?>

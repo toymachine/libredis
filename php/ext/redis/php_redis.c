@@ -45,7 +45,7 @@ PHP_METHOD(Ketama, add_server)
 	long port;
 	long weight;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sll", &ip, &ip_len, &port, &weight) == FAILURE) {
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "sll", &ip, &ip_len, &port, &weight) == FAILURE) {
 		RETURN_NULL();
 	}
 
@@ -57,7 +57,7 @@ PHP_METHOD(Ketama, get_server)
 	char *key;
 	int key_len;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &key, &key_len) == FAILURE) {
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "s", &key, &key_len) == FAILURE) {
 		RETURN_NULL();
 	}
 
@@ -68,7 +68,7 @@ PHP_METHOD(Ketama, get_server_addr)
 {
 	long ordinal;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "l", &ordinal) == FAILURE) {
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "l", &ordinal) == FAILURE) {
 		RETURN_NULL();
 	}
 
@@ -100,7 +100,7 @@ PHP_METHOD(Connection, __construct)
 	char *addr;
 	int addr_len;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &addr, &addr_len) == FAILURE) {
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "s", &addr, &addr_len) == FAILURE) {
 		RETURN_NULL();
 	}
 
@@ -117,15 +117,19 @@ PHP_METHOD(Connection, execute)
 {
 	zval *obj;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "O", &obj, batch_ce) == FAILURE) {
+	zend_bool dispatch = 0;
+
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "O|b", &obj, batch_ce, &dispatch) == FAILURE) {
 		RETURN_NULL();
 	}
 
 	Batch *batch = T_fromObj(Batch, batch_ce, obj);
-	//printf("conn exec batch %x\n", batch);
 
 	Connection_execute(Connection_getThis(), batch);
-//	Batch_write(Batch_getThis(), str, str_len);
+
+	if(dispatch) {
+		Module_dispatch();
+	}
 }
 
 function_entry connection_methods[] = {
@@ -144,6 +148,19 @@ function_entry connection_methods[] = {
 PHP_METHOD(Batch, __construct)
 {
 	Batch_setThis(Batch_new());
+
+	char *str = NULL;
+	int str_len = 0;
+	long num_commands = 0;
+
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "|sl", &str, &str_len, &num_commands) == FAILURE) {
+		RETURN_NULL();
+	}
+
+	if(str != NULL && str_len > 0) {
+		Batch_write(Batch_getThis(), str, str_len, num_commands);
+	}
+
 }
 
 PHP_METHOD(Batch, __destruct)
@@ -156,24 +173,13 @@ PHP_METHOD(Batch, write)
 {
 	char *str;
 	int str_len;
+	long num_commands = 0;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &str, &str_len) == FAILURE) {
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "s|l", &str, &str_len, &num_commands) == FAILURE) {
 		RETURN_NULL();
 	}
 
-	//printf("batch wr on %x\n", Batch_getThis());
-	Batch_write(Batch_getThis(), str, str_len);
-}
-
-PHP_METHOD(Batch, finalize)
-{
-	long num_commands;
-
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "l", &num_commands) == FAILURE) {
-		RETURN_NULL();
-	}
-
-	Batch_finalize(Batch_getThis(), num_commands);
+	Batch_write(Batch_getThis(), str, str_len, num_commands);
 }
 
 PHP_METHOD(Batch, next_reply)
@@ -182,6 +188,7 @@ PHP_METHOD(Batch, next_reply)
 	zval *reply_value;
 	zval *reply_length;
 
+	//not using parameters_ex because of byref args
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "zzz", &reply_type, &reply_value, &reply_length) == FAILURE) {
 		RETURN_NULL();
 	}
@@ -249,7 +256,6 @@ function_entry batch_methods[] = {
     PHP_ME(Batch,  __construct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR)
     PHP_ME(Batch,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
     PHP_ME(Batch,  write,           NULL, ZEND_ACC_PUBLIC)
-    PHP_ME(Batch,  finalize,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Batch,  next_reply,           NULL, ZEND_ACC_PUBLIC)
     {NULL, NULL, NULL}
 };

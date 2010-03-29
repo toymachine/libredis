@@ -13,7 +13,7 @@ struct _Batch
 {
 	struct list_head list; //for creating lists of batches
 
-	int commands;
+	int num_commands;
 	struct list_head reply_queue; //finished commands that have replies set
 
 	Buffer *write_buffer;
@@ -142,11 +142,7 @@ Batch *Batch_new()
 		batch->read_buffer = Buffer_new(DEFAULT_READ_BUFF_SIZE);
 		batch->write_buffer = Buffer_new(DEFAULT_WRITE_BUFF_SIZE);
 	}
-	else {
-		Buffer_clear(batch->read_buffer);
-		Buffer_clear(batch->write_buffer);
-	}
-	batch->commands = 0;
+	batch->num_commands = 0;
 	INIT_LIST_HEAD(&batch->reply_queue);
 
 	batch->current_reply_sp = 0;
@@ -166,8 +162,8 @@ void _Batch_free(Batch *batch, int final)
 		Buffer_free(batch->write_buffer);
 	}
 	else {
-		//note that we don't free the buffers, because we will re-use them
-		//TODO ungrow buffers here when not final
+		Buffer_clear(batch->read_buffer);
+		Buffer_clear(batch->write_buffer);
 #ifndef NDEBUG
 		Buffer_fill(batch->read_buffer, (Byte)0xEA);
 		Buffer_fill(batch->write_buffer, (Byte)0xEA);
@@ -176,27 +172,17 @@ void _Batch_free(Batch *batch, int final)
 	Batch_list_free(batch, final);
 }
 
-void Batch_writef(Batch *batch, const char *format, ...)
+void Batch_write(Batch *batch, const char *str, size_t str_len, int num_commands)
 {
-	va_list args;
-	va_start(args, format);
-	Buffer_vprintf(batch->write_buffer, format, args);
-	va_end(args);
-}
-
-void Batch_write(Batch *batch, const char *str, size_t str_len)
-{
-	Buffer_printf(batch->write_buffer, "%.*s", str_len, str);
-}
-
-void Batch_finalize(Batch *batch, int num_commands)
-{
-	batch->commands = num_commands;
+	if(str != NULL && str_len > 0) {
+		Buffer_write(batch->write_buffer, str, str_len);
+	}
+	batch->num_commands += num_commands;
 }
 
 int Batch_has_command(Batch *batch)
 {
-	return batch->commands > 0;
+	return batch->num_commands > 0;
 }
 
 
@@ -204,7 +190,7 @@ void Batch_add_reply(Batch *batch, Reply *reply)
 {
 	DEBUG(("pop cmd from command queue\n"));
 	DEBUG(("add reply/cmd back to reply queue\n"));
-	batch->commands -= 1;
+	batch->num_commands -= 1;
 	list_add(&reply->list, &batch->reply_queue);
 }
 
