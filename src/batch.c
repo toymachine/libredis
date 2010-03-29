@@ -142,10 +142,6 @@ Batch *Batch_new()
 		batch->read_buffer = Buffer_new(DEFAULT_READ_BUFF_SIZE);
 		batch->write_buffer = Buffer_new(DEFAULT_WRITE_BUFF_SIZE);
 	}
-	else {
-		Buffer_clear(batch->read_buffer);
-		Buffer_clear(batch->write_buffer);
-	}
 	batch->num_commands = 0;
 	INIT_LIST_HEAD(&batch->reply_queue);
 
@@ -166,8 +162,8 @@ void _Batch_free(Batch *batch, int final)
 		Buffer_free(batch->write_buffer);
 	}
 	else {
-		//note that we don't free the buffers, because we will re-use them
-		//TODO ungrow buffers here when not final
+		Buffer_clear(batch->read_buffer);
+		Buffer_clear(batch->write_buffer);
 #ifndef NDEBUG
 		Buffer_fill(batch->read_buffer, (Byte)0xEA);
 		Buffer_fill(batch->write_buffer, (Byte)0xEA);

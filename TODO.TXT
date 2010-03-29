@@ -2,7 +2,6 @@
 - php persistent connections/ketama's
 - php alloc
 
-- buffer grow stuff / vsprint last 0 stuff
 - socket creation errors
 - connection timeout
 - connection (re) connect and errors

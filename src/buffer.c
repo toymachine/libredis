@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <assert.h>
 
 #include "common.h"
 #include "buffer.h"
@@ -11,13 +12,12 @@
 
 struct _Buffer
 {
-	Byte *data;
-	Byte *buff;
-	size_t buff_size;
+	Byte *data; //the current data (at first points to buff, but by enlargement might point to some enlarged buffer
+	Byte *buff; //the original buffer as allocated when buffer created
+	size_t buff_size; //original buffer size
 	size_t position;
 	int limit;
-	int capacity;
-	int mark;
+	int capacity; //current capacity
 };
 
 Buffer *Buffer_new(size_t size)
@@ -29,7 +29,6 @@ Buffer *Buffer_new(size_t size)
 	buffer->position = 0;
 	buffer->capacity = size;
 	buffer->limit = buffer->capacity;
-	buffer->mark = 0;
 #ifndef NDEBUG
 	Buffer_fill(buffer, (Byte)0xEA);
 #endif
@@ -45,9 +44,14 @@ void Buffer_fill(Buffer *buffer, Byte b)
 
 void Buffer_clear(Buffer *buffer)
 {
+	if(buffer->capacity > buffer->buff_size) {
+		DEBUG(("Clearing enlarged buffer\n"));
+		Alloc_free(buffer->data, buffer->capacity);
+	}
+	buffer->data = buffer->buff;
 	buffer->position = 0;
-	buffer->limit = buffer->capacity;
-	buffer->mark = 0;
+	buffer->limit = buffer->buff_size;
+	buffer->capacity = buffer->buff_size;
 }
 
 int Buffer_free(Buffer *buffer)
@@ -113,12 +117,25 @@ int Buffer_set_limit(Buffer *buffer, int limit)
 
 int Buffer_ensure_remaining(Buffer *buffer, int min_remaining)
 {
-	size_t remaining = Buffer_remaining(buffer);
-	if(remaining < min_remaining) {
-		printf("TODO");
-		abort();
+	assert(buffer->limit == buffer->capacity);
+	while(Buffer_remaining(buffer) < min_remaining) {
+		buffer->limit *= 2;
 	}
-	return remaining;
+	assert(buffer->limit >= buffer->capacity);
+	if(buffer->limit > buffer->capacity) {
+		if(buffer->capacity == buffer->buff_size) {
+			DEBUG(("growing buffer first time, new cap: %d, old cap: %d\n", buffer->limit, buffer->capacity));
+			buffer->data = Alloc_alloc(buffer->limit);
+			memcpy(buffer->data, buffer->buff, buffer->capacity);
+		}
+		else {
+			DEBUG(("growing buffer second or more time, new cap: %d, old cap: %d\n", buffer->limit, buffer->capacity));
+			buffer->data = Alloc_realloc(buffer->data, buffer->limit, buffer->capacity);
+		}
+		buffer->capacity = buffer->limit;
+	}
+	assert(buffer->limit == buffer->capacity);
+	return Buffer_remaining(buffer);
 }
 
 size_t Buffer_send(Buffer *buffer, int fd)
@@ -134,7 +151,7 @@ size_t Buffer_send(Buffer *buffer, int fd)
 
 size_t Buffer_recv(Buffer *buffer, int fd)
 {
-	Buffer_ensure_remaining(buffer, (buffer->capacity * 256) / 2048);
+	Buffer_ensure_remaining(buffer, (buffer->capacity * 256) / 2048); //make sure we have still 1/8 remaining
 	DEBUG(("Buffer_recv fd: %d, position: %d, limit: %d, remaining: %d\n", fd, buffer->position, buffer->limit, Buffer_remaining(buffer)));
 	size_t bytes_read = read(fd, buffer->data + buffer->position, Buffer_remaining(buffer));
 	DEBUG(("Buffer_recv fd: %d, bytes_read: %d\n", fd, bytes_read));

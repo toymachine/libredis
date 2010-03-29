@@ -105,7 +105,7 @@ function test_simple() {
 	
 	$connection = new Redis_Connection("127.0.0.1:6379");
 	
-	for($i = 0; $i < 1000000; $i++) {
+	for($i = 0; $i < 100; $i++) {
 		_test_simple($connection, "library");
 	}
 }
@@ -128,9 +128,13 @@ function test_integer_reply()
 	}
 }
 
+$batch = new Redis_Batch();
+for($i = 0; $i < 10000; $i++) {
+  $batch->write("INCR");  
+}
 //test_ketama();
 //test_simple();
-test_mget();
+//test_mget();
 //test_integer_reply();
 //echo "done...!", PHP_EOL;
 ?>
