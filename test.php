@@ -81,35 +81,20 @@ function test_mget()
 	print_r(mget(array("piet1", "piet2", "piet3", "piet4", "xx3"), $ketama));
 }
 
-function _test_simple($connection)
+function _test_simple($connection, $key)
 {
-	$batch = new Redis_Batch();
-	$key = "piet";
-    $batch->write("GET $key\r\n");	
-    $batch->write("MGET $key $key\r\n");
-    $batch->write("GET $key\r\n");	
-	$batch->finalize(3);
-	
-	$connection->execute($batch);
-	
-	Redis_dispatch();
-	
-	while($level = $batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
-		echo "start", PHP_EOL;
-		echo "\ttype ", $reply_type, PHP_EOL;
-		echo "\tval ", $reply_value, PHP_EOL;
-		echo "\tlen ", $reply_length, PHP_EOL;
-		echo "\tlevel ", $level, PHP_EOL;
-		echo "end", PHP_EOL;
-	}
+	$batch = new Redis_Batch("GET $key\r\n", 1);
+	$connection->execute($batch, true);
+	$batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
+	return $reply_value;
 }
 
 function test_simple() {
 	
 	$connection = new Redis_Connection("127.0.0.1:6379");
 	
-	for($i = 0; $i < 1; $i++) {
-		_test_simple($connection);
+	for($i = 0; $i < 1000000; $i++) {
+		_test_simple($connection, "library");
 	}
 }
 
@@ -132,9 +117,8 @@ function test_integer_reply()
 }
 
 //test_ketama();
-//test_simple();
+test_simple();
 //test_mget();
-test_integer_reply();
-
-echo "done...!", PHP_EOL;
+//test_integer_reply();
+//echo "done...!", PHP_EOL;
 ?>

@@ -13,7 +13,7 @@ struct _Batch
 {
 	struct list_head list; //for creating lists of batches
 
-	int commands;
+	int num_commands;
 	struct list_head reply_queue; //finished commands that have replies set
 
 	Buffer *write_buffer;
@@ -146,7 +146,7 @@ Batch *Batch_new()
 		Buffer_clear(batch->read_buffer);
 		Buffer_clear(batch->write_buffer);
 	}
-	batch->commands = 0;
+	batch->num_commands = 0;
 	INIT_LIST_HEAD(&batch->reply_queue);
 
 	batch->current_reply_sp = 0;
@@ -176,27 +176,17 @@ void _Batch_free(Batch *batch, int final)
 	Batch_list_free(batch, final);
 }
 
-void Batch_writef(Batch *batch, const char *format, ...)
+void Batch_write(Batch *batch, const char *str, size_t str_len, int num_commands)
 {
-	va_list args;
-	va_start(args, format);
-	Buffer_vprintf(batch->write_buffer, format, args);
-	va_end(args);
-}
-
-void Batch_write(Batch *batch, const char *str, size_t str_len)
-{
-	Buffer_printf(batch->write_buffer, "%.*s", str_len, str);
-}
-
-void Batch_finalize(Batch *batch, int num_commands)
-{
-	batch->commands = num_commands;
+	if(str != NULL && str_len > 0) {
+		Buffer_printf(batch->write_buffer, "%.*s", str_len, str);
+	}
+	batch->num_commands += num_commands;
 }
 
 int Batch_has_command(Batch *batch)
 {
-	return batch->commands > 0;
+	return batch->num_commands > 0;
 }
 
 
@@ -204,7 +194,7 @@ void Batch_add_reply(Batch *batch, Reply *reply)
 {
 	DEBUG(("pop cmd from command queue\n"));
 	DEBUG(("add reply/cmd back to reply queue\n"));
-	batch->commands -= 1;
+	batch->num_commands -= 1;
 	list_add(&reply->list, &batch->reply_queue);
 }
 
@@ -244,7 +234,7 @@ int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *l
 //		RT_INTEGER = 7
 	if(current_reply->type == RT_OK ||
 	   current_reply->type == RT_ERROR ||
-	   current_reply->type == RT_BULK,
+	   current_reply->type == RT_BULK ||
 	   current_reply->type == RT_INTEGER) {
 		*data = Reply_data(current_reply);
 	}
