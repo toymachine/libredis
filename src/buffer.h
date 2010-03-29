@@ -18,8 +18,7 @@ size_t Buffer_position(Buffer *buffer);
 int Buffer_set_position(Buffer *buffer, size_t position);
 int Buffer_set_limit(Buffer *buffer, int limit);
 int Buffer_remaining(Buffer *buffer);
-int Buffer_printf(Buffer *buffer, const char *format, ...);
-int Buffer_vprintf(Buffer *buffer, const char *format, va_list args);
+int Buffer_write(Buffer *buffer, const char *data, size_t len);
 size_t Buffer_recv(Buffer *buffer, int fd);
 size_t Buffer_send(Buffer *buffer, int fd);
 

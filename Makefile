@@ -13,3 +13,15 @@ php_fast:
 
 php_test: php_fast
 	php test.php
+
+use_debug:
+	rm -rf lib/libredis.so
+	cd Debug; make clean; make
+	cd lib; ln -s ../Debug/libredis.so libredis.so
+
+use_release:
+	rm -rf lib/libredis.so
+	cd Release; make clean; make
+	cd lib; ln -s ../Release/libredis.so libredis.so
+
+

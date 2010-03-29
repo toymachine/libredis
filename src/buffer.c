@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <string.h>
 
 #include "common.h"
 #include "buffer.h"
@@ -110,18 +111,15 @@ int Buffer_set_limit(Buffer *buffer, int limit)
 	return 0;
 }
 
-int Buffer_grow(Buffer *buffer)
+int Buffer_ensure_remaining(Buffer *buffer, int min_remaining)
 {
-	size_t min_remaining = (buffer->capacity * 256) / 2048;
 	size_t remaining = Buffer_remaining(buffer);
-	DEBUG(("min remaining: %d, rem: %d\n", min_remaining, remaining));
 	if(remaining < min_remaining) {
-		printf("TODO grow buffer\n");
-		abort();//TODO
-	};
-	return Buffer_remaining(buffer);
+		printf("TODO");
+		abort();
+	}
+	return remaining;
 }
-
 
 size_t Buffer_send(Buffer *buffer, int fd)
 {
@@ -136,7 +134,7 @@ size_t Buffer_send(Buffer *buffer, int fd)
 
 size_t Buffer_recv(Buffer *buffer, int fd)
 {
-	Buffer_grow(buffer);
+	Buffer_ensure_remaining(buffer, (buffer->capacity * 256) / 2048);
 	DEBUG(("Buffer_recv fd: %d, position: %d, limit: %d, remaining: %d\n", fd, buffer->position, buffer->limit, Buffer_remaining(buffer)));
 	size_t bytes_read = read(fd, buffer->data + buffer->position, Buffer_remaining(buffer));
 	DEBUG(("Buffer_recv fd: %d, bytes_read: %d\n", fd, bytes_read));
@@ -153,29 +151,11 @@ int Buffer_flip(Buffer *buffer)
 	return 0;
 }
 
-int Buffer_vprintf(Buffer *buffer, const char *format, va_list args)
+int Buffer_write(Buffer *buffer, const char *data, size_t len)
 {
-	//TODO what about \0 that vsnprintf adds?
-	int remaining = buffer->limit - buffer->position;
-	int written = vsnprintf(buffer->data + buffer->position, remaining, format, args);
-	if(written > remaining) {
-		Buffer_grow(buffer);
-		remaining = buffer->limit - buffer->position;
-		written = vsnprintf(buffer->data + buffer->position, remaining, format, args);
-		//TODO check written again
-		printf("TODO!\n");
-		abort();
-	}
-	buffer->position += written;
+	Buffer_ensure_remaining(buffer, len);
+	memcpy(buffer->data + buffer->position, data, len);
+	buffer->position += len;
 	return 0;
-}
-
-int Buffer_printf(Buffer *buffer, const char *format, ...)
-{
-	va_list args;
-	va_start(args, format);
-	int res = Buffer_vprintf(buffer, format, args);
-	va_end(args);
-	return res;
 }
 

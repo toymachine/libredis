@@ -179,7 +179,7 @@ void _Batch_free(Batch *batch, int final)
 void Batch_write(Batch *batch, const char *str, size_t str_len, int num_commands)
 {
 	if(str != NULL && str_len > 0) {
-		Buffer_printf(batch->write_buffer, "%.*s", str_len, str);
+		Buffer_write(batch->write_buffer, str, str_len);
 	}
 	batch->num_commands += num_commands;
 }
