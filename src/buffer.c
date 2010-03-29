@@ -16,7 +16,6 @@ struct _Buffer
 	size_t position;
 	int limit;
 	int capacity;
-	int mark;
 };
 
 Buffer *Buffer_new(size_t size)
@@ -28,7 +27,6 @@ Buffer *Buffer_new(size_t size)
 	buffer->position = 0;
 	buffer->capacity = size;
 	buffer->limit = buffer->capacity;
-	buffer->mark = 0;
 #ifndef NDEBUG
 	Buffer_fill(buffer, (Byte)0xEA);
 #endif
@@ -46,7 +44,6 @@ void Buffer_clear(Buffer *buffer)
 {
 	buffer->position = 0;
 	buffer->limit = buffer->capacity;
-	buffer->mark = 0;
 }
 
 int Buffer_free(Buffer *buffer)

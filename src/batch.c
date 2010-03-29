@@ -244,7 +244,7 @@ int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *l
 //		RT_INTEGER = 7
 	if(current_reply->type == RT_OK ||
 	   current_reply->type == RT_ERROR ||
-	   current_reply->type == RT_BULK,
+	   current_reply->type == RT_BULK ||
 	   current_reply->type == RT_INTEGER) {
 		*data = Reply_data(current_reply);
 	}
