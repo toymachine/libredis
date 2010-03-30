@@ -3,6 +3,7 @@
 #endif
 
 #include <stdlib.h>
+#include <syslog.h>
 
 #include "php.h"
 #include "zend.h"
@@ -17,18 +18,15 @@
 zend_class_entry *batch_ce;
 zend_class_entry *ketama_ce;
 zend_class_entry *connection_ce;
+zend_class_entry *redis_ce;
 
 Module g_module;
+
 /**************** KETAMA ***********************/
 
 
 #define Ketama_getThis() T_getThis(Ketama, ketama_ce)
 #define Ketama_setThis(p) T_setThis(p, ketama_ce)
-
-PHP_METHOD(Ketama, __construct)
-{
-	Ketama_setThis(Ketama_new());
-}
 
 PHP_METHOD(Ketama, __destruct)
 {
@@ -79,7 +77,6 @@ PHP_METHOD(Ketama, create_continuum)
 }
 
 function_entry ketama_methods[] = {
-    PHP_ME(Ketama,  __construct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR)
     PHP_ME(Ketama,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
     PHP_ME(Ketama,  add_server,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Ketama,  get_server,           NULL, ZEND_ACC_PUBLIC)
@@ -92,18 +89,6 @@ function_entry ketama_methods[] = {
 
 #define Connection_getThis() T_getThis(Connection, connection_ce)
 #define Connection_setThis(p) T_setThis(p, connection_ce)
-
-PHP_METHOD(Connection, __construct)
-{
-	char *addr;
-	int addr_len;
-
-	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "s", &addr, &addr_len) == FAILURE) {
-		RETURN_NULL();
-	}
-
-	Connection_setThis(Connection_new(addr));
-}
 
 PHP_METHOD(Connection, __destruct)
 {
@@ -131,7 +116,6 @@ PHP_METHOD(Connection, execute)
 }
 
 function_entry connection_methods[] = {
-    PHP_ME(Connection,  __construct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR)
     PHP_ME(Connection,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
     PHP_ME(Connection,  execute,           NULL, ZEND_ACC_PUBLIC)
     {NULL, NULL, NULL}
@@ -143,23 +127,6 @@ function_entry connection_methods[] = {
 #define Batch_getThis() T_getThis(Batch, batch_ce)
 #define Batch_setThis(p) T_setThis(p, batch_ce)
 
-PHP_METHOD(Batch, __construct)
-{
-	Batch_setThis(Batch_new());
-
-	char *str = NULL;
-	int str_len = 0;
-	long num_commands = 0;
-
-	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "|sl", &str, &str_len, &num_commands) == FAILURE) {
-		RETURN_NULL();
-	}
-
-	if(str != NULL && str_len > 0) {
-		Batch_write(Batch_getThis(), str, str_len, num_commands);
-	}
-
-}
 
 PHP_METHOD(Batch, __destruct)
 {
@@ -215,7 +182,7 @@ PHP_METHOD(Batch, next_reply)
 
 	ZVAL_LONG(reply_type, c_reply_type);
 
-	zval_dtor(reply_value);
+	zval_dtor(reply_value); //make sure any previous result is discarded (otherwise we would leak memory here)
 
     if(c_reply_type == RT_OK ||
        c_reply_type == RT_ERROR ||
@@ -241,7 +208,6 @@ PHP_METHOD(Batch, next_reply)
 }
 
 function_entry batch_methods[] = {
-    PHP_ME(Batch,  __construct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR)
     PHP_ME(Batch,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
     PHP_ME(Batch,  write,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Batch,  next_reply,           NULL, ZEND_ACC_PUBLIC)
@@ -250,32 +216,91 @@ function_entry batch_methods[] = {
 
 /***************** PHP MODULE **************************/
 
-PHP_FUNCTION(Redis_dispatch)
+PHP_FUNCTION(Libredis)
+{
+	object_init_ex(return_value, redis_ce);
+}
+
+PHP_METHOD(Redis, create_ketama)
+{
+	object_init_ex(return_value, ketama_ce);
+	zend_update_property_long(ketama_ce, return_value, "handle", 6, (long)Ketama_new());
+}
+
+PHP_METHOD(Redis, create_connection)
+{
+	char *addr;
+	int addr_len;
+
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "s", &addr, &addr_len) == FAILURE) {
+		RETURN_NULL();
+	}
+
+	object_init_ex(return_value, connection_ce);
+	zend_update_property_long(connection_ce, return_value, "handle", 6, (long)Connection_new(addr));
+}
+
+PHP_METHOD(Redis, create_batch)
+{
+	Batch *batch = Batch_new();
+	object_init_ex(return_value, batch_ce);
+	zend_update_property_long(batch_ce, return_value, "handle", 6, (long)batch);
+
+	char *str = NULL;
+	int str_len = 0;
+	long num_commands = 0;
+
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "|sl", &str, &str_len, &num_commands) == FAILURE) {
+		RETURN_NULL();
+	}
+
+	if(str != NULL && str_len > 0) {
+		Batch_write(batch, str, str_len, num_commands);
+	}
+
+}
+
+PHP_METHOD(Redis, dispatch)
 {
 	Module_dispatch();
 }
+
+function_entry redis_methods[] = {
+    PHP_ME(Redis,  create_ketama,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Redis,  create_connection,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Redis,  create_batch,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Redis,  dispatch,           NULL, ZEND_ACC_PUBLIC)
+    {NULL, NULL, NULL}
+};
 
 PHP_MINIT_FUNCTION(redis)
 {
     zend_class_entry ce;
 
-    INIT_CLASS_ENTRY(ce, "Redis_Ketama", ketama_methods);
+    openlog("libredis", 0, LOG_LOCAL2);
+
+    INIT_CLASS_ENTRY(ce, "_Libredis_Ketama", ketama_methods);
     ketama_ce = zend_register_internal_class(&ce TSRMLS_CC);
     zend_declare_property_long(ketama_ce, "handle", 6, 0, ZEND_ACC_PRIVATE);
 
-    INIT_CLASS_ENTRY(ce, "Redis_Connection", connection_methods);
+    INIT_CLASS_ENTRY(ce, "_Libredis_Connection", connection_methods);
     connection_ce = zend_register_internal_class(&ce TSRMLS_CC);
     zend_declare_property_long(connection_ce, "handle", 6, 0, ZEND_ACC_PRIVATE);
 
-    INIT_CLASS_ENTRY(ce, "Redis_Batch", batch_methods);
+    INIT_CLASS_ENTRY(ce, "_Libredis_Batch", batch_methods);
     batch_ce = zend_register_internal_class(&ce TSRMLS_CC);
     zend_declare_property_long(batch_ce, "handle", 6, 0, ZEND_ACC_PRIVATE);
+
+    INIT_CLASS_ENTRY(ce, "_Libredis_Redis", redis_methods);
+    redis_ce = zend_register_internal_class(&ce TSRMLS_CC);
 
     g_module.size = sizeof(Module);
     g_module.alloc_malloc = __zend_malloc;
     g_module.alloc_realloc = __zend_realloc;
     g_module.alloc_free = free;
     Module_init(&g_module);
+
+    syslog(LOG_DEBUG, "libredis module init");
 
     return SUCCESS;
 }
@@ -284,11 +309,13 @@ PHP_MSHUTDOWN_FUNCTION(redis)
 {
 	Module_free();
 
+	syslog(LOG_DEBUG, "libredis module shutdown complete, final alloc: %d\n", g_module.allocated);
+
 	return SUCCESS;
 }
 
 static function_entry redis_functions[] = {
-    PHP_FE(Redis_dispatch, NULL)
+    PHP_FE(Libredis, NULL)
     {NULL, NULL, NULL}
 };
 

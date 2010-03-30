@@ -1,7 +1,10 @@
 <?php
 
+$libredis = Libredis();
+
 function test_ketama() {
-	$ketama = new Redis_Ketama();
+    global $libredis;
+	$ketama = $libredis->create_ketama();
     $ketama->add_server("10.0.1.1", 11211, 600);
     $ketama->add_server("10.0.1.2", 11211, 300);
     $ketama->add_server("10.0.1.3", 11211, 200);
@@ -12,10 +15,24 @@ function test_ketama() {
     $ketama->add_server("10.0.1.8", 11211, 100);
     
     $ketama->create_continuum();
-    
     $ordinal = $ketama->get_server("piet5234");
 	echo "ord: ", $ordinal, PHP_EOL;
 	echo "addr: ", $ketama->get_server_addr($ordinal), PHP_EOL;
+	
+	//speed of creating continuum:
+    $start = microtime(true);
+	$N = 1000;
+	for($j = 0; $j < $N; $j++) {
+    	$ketama = $libredis->create_ketama();
+    	$M = 100;
+    	for($i = 0; $i < $M; $i++) {
+    	   $ketama->add_server("10.0.1.$i", 11211, 100);
+    	}
+        $ketama->create_continuum();
+	}
+	
+    $end = microtime(true);
+    echo "speed creating $N times a continuum for $M servers: ", ($end - $start) / $N, PHP_EOL;
 }
 
 
@@ -24,19 +41,21 @@ function get_connection($addr)
 {
     static $connections = array();
     if(!isset($connections[$addr])) {
-        $connections[$addr] = new Redis_Connection($addr);
+        global $libredis;
+        $connections[$addr] = $libredis->create_connection($addr);
     } 
     return $connections[$addr];  
 }
 
 function mget($keys, $ketama) {
+    global $libredis;
 	$batches = array();
 	$batch_keys = array();
     //add all keys to batches
     foreach($keys as $key) {
         $server_ordinal = $ketama->get_server($key);
         if(!isset($batches[$server_ordinal])) {
-            $batch = new Redis_Batch("MGET");
+            $batch = $libredis->create_batch("MGET");
             $batches[$server_ordinal] = $batch;
     	}
     	else {
@@ -53,7 +72,7 @@ function mget($keys, $ketama) {
         $connection->execute($batch);
     }
     //handle events until all complete
-	Redis_dispatch();
+	$libredis->dispatch();
     //build up results
     $results = array();
     foreach($batches as $server_ordinal=>$batch) {
@@ -70,7 +89,8 @@ function mget($keys, $ketama) {
 
 function test_mget()
 {
-    $ketama = new Redis_Ketama();
+    global $libredis;
+    $ketama = $libredis->create_ketama();
     $ketama->add_server("127.0.0.1", 6379, 100);
     $ketama->add_server("127.0.0.1", 6380, 100);
     $ketama->create_continuum();
@@ -86,9 +106,9 @@ function test_mget()
         $key = "piet$i";
         $value = "blaat$i";
         $len = strlen($value);
-        $batch = new Redis_Batch("SET $key $len\r\n$value\r\n", 1);
+        $batch = $libredis->create_batch("SET $key $len\r\n$value\r\n", 1);
         $connection1->execute($batch, true);
-        $batch = new Redis_Batch("SET $key $len\r\n$value\r\n", 1);
+        $batch = $libredis->create_batch("SET $key $len\r\n$value\r\n", 1);
         $connection2->execute($batch, true);
         $keys[] = $key;
     }
@@ -105,7 +125,8 @@ function test_mget()
 
 function _test_simple($connection, $key)
 {
-	$batch = new Redis_Batch("GET $key\r\n", 1);
+    global $libredis;
+	$batch = $libredis->create_batch("GET $key\r\n", 1);
 	$connection->execute($batch, true);
 	$batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
 	return $reply_value;
@@ -113,7 +134,8 @@ function _test_simple($connection, $key)
 
 function test_simple() {
 	
-	$connection = new Redis_Connection("127.0.0.1:6379");
+    global $libredis;
+	$connection = $libredis->create_connection("127.0.0.1:6379");
 	
 	for($i = 0; $i < 100; $i++) {
 		_test_simple($connection, "library");
@@ -121,7 +143,6 @@ function test_simple() {
 }
 
 function test_destroy() {
-    //$connection = new Redis_Connection("127.0.0.1:6379");
     $connection = get_connection("127.0.0.1:6379");
     $connection = get_connection("127.0.0.1:6379");
     $connection = get_connection("127.0.0.1:6379");
@@ -129,12 +150,11 @@ function test_destroy() {
 
 function test_integer_reply()
 {
-	$batch = new Redis_Batch();
-    $batch->write("INCR incr_test\r\n");	
-    $batch->finalize(1);
-	$connection = new Redis_Connection("127.0.0.1:6379");
+    global $libredis;
+	$batch = $libredis->create_batch("INCR incr_test\r\n", 1);
+	$connection = $libredis->create_connection("127.0.0.1:6379");
 	$connection->execute($batch);
-	Redis_dispatch();
+	$libredis->dispatch();
 	while($level = $batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
 		echo "start", PHP_EOL;
 		echo "\ttype ", $reply_type, PHP_EOL;
@@ -147,8 +167,8 @@ function test_integer_reply()
 
 //test_ketama();
 //test_simple();
-test_mget();
+//test_mget();
 //test_destroy();
-//test_integer_reply();
+test_integer_reply();
 //echo "done...!", PHP_EOL;
 ?>

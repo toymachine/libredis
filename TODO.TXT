@@ -1,13 +1,14 @@
-- php module shutdown not done?, why not, debug show sighup or something
-- php persistent connections/ketama's (profile ketama first)
+- php persistent connections
+- php abort
 
 - socket creation errors
 - connection timeout
 - connection (re) connect and errors
 - connection reply parser error
 - connection read and write timeouts
-- reconnect when server disconnected (auto server disconnect)
 - read and write EOF
 - other read and write errors
+- signal interrupt errors?
 
 
+- reconnect when server disconnected (auto server disconnect)
