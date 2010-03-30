@@ -1,4 +1,3 @@
-- php persistent connections
 - php abort
 
 - socket creation errors
@@ -12,3 +11,4 @@
 
 
 - reconnect when server disconnected (auto server disconnect)
+- make proper php module globals for g_connections and g_module

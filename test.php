@@ -36,17 +36,6 @@ function test_ketama() {
 }
 
 
-//simple connection manager
-function get_connection($addr)
-{
-    static $connections = array();
-    if(!isset($connections[$addr])) {
-        global $libredis;
-        $connections[$addr] = $libredis->create_connection($addr);
-    } 
-    return $connections[$addr];  
-}
-
 function mget($keys, $ketama) {
     global $libredis;
 	$batches = array();
@@ -68,7 +57,7 @@ function mget($keys, $ketama) {
     foreach($batches as $server_ordinal=>$batch) {
         $batch->write("\r\n", 1);
         $server_addr = $ketama->get_server_addr($server_ordinal);
-		$connection = get_connection($server_addr);	
+		$connection = $libredis->get_connection($server_addr);	
         $connection->execute($batch);
     }
     //handle events until all complete
@@ -99,8 +88,8 @@ function test_mget()
     $N = 20000;
     $M = 200;
     
-    $connection1 = get_connection("127.0.0.1:6379");;
-    $connection2 = get_connection("127.0.0.1:6380");
+    $connection1 = $libredis->get_connection("127.0.0.1:6379");;
+    $connection2 = $libredis->get_connection("127.0.0.1:6380");
     $keys = array();
     for($i = 0; $i < $M; $i++) {
         $key = "piet$i";
@@ -135,7 +124,7 @@ function _test_simple($connection, $key)
 function test_simple() {
 	
     global $libredis;
-	$connection = $libredis->create_connection("127.0.0.1:6379");
+	$connection = $libredis->get_connection("127.0.0.1:6379");
 	
 	for($i = 0; $i < 100; $i++) {
 		_test_simple($connection, "library");
@@ -143,16 +132,17 @@ function test_simple() {
 }
 
 function test_destroy() {
-    $connection = get_connection("127.0.0.1:6379");
-    $connection = get_connection("127.0.0.1:6379");
-    $connection = get_connection("127.0.0.1:6379");
+    global $libredis;
+    $connection = $libredis->get_connection("127.0.0.1:6379");
+    $connection = $libredis->get_connection("127.0.0.1:6379");
+    $connection = $libredis->get_connection("127.0.0.1:6379");
 }
 
 function test_integer_reply()
 {
     global $libredis;
 	$batch = $libredis->create_batch("INCR incr_test\r\n", 1);
-	$connection = $libredis->create_connection("127.0.0.1:6379");
+	$connection = $libredis->get_connection("127.0.0.1:6379");
 	$connection->execute($batch);
 	$libredis->dispatch();
 	while($level = $batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
@@ -165,10 +155,20 @@ function test_integer_reply()
 	}
 }
 
+function test_connections()
+{
+    global $libredis;
+    for($i = 0; $i < 10; $i++) {    
+        $connection1 = $libredis->get_connection("127.0.0.1:6379");
+        $connection2 = $libredis->get_connection("127.0.0.1:6380");
+    }
+}
+
 //test_ketama();
 //test_simple();
-//test_mget();
+test_mget();
 //test_destroy();
-test_integer_reply();
+//test_integer_reply();
+//test_connections();
 //echo "done...!", PHP_EOL;
 ?>

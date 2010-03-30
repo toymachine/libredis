@@ -21,6 +21,7 @@ zend_class_entry *connection_ce;
 zend_class_entry *redis_ce;
 
 Module g_module;
+HashTable g_connections;
 
 /**************** KETAMA ***********************/
 
@@ -92,7 +93,7 @@ function_entry ketama_methods[] = {
 
 PHP_METHOD(Connection, __destruct)
 {
-	Connection_free(Connection_getThis());
+	//note that we not 'free' the real connection, because that is persistent
 	Connection_setThis(0);
 }
 
@@ -227,7 +228,7 @@ PHP_METHOD(Redis, create_ketama)
 	zend_update_property_long(ketama_ce, return_value, "handle", 6, (long)Ketama_new());
 }
 
-PHP_METHOD(Redis, create_connection)
+PHP_METHOD(Redis, get_connection)
 {
 	char *addr;
 	int addr_len;
@@ -236,8 +237,29 @@ PHP_METHOD(Redis, create_connection)
 		RETURN_NULL();
 	}
 
+	Connection *connection;
+	void *pDest;
+	if(FAILURE == zend_hash_find(&g_connections, addr, addr_len, &pDest)) {
+		//syslog(LOG_DEBUG, "connection not found: %s", addr);
+		connection = Connection_new(addr);
+		//syslog(LOG_DEBUG, "connection created addr: %p", connection);
+		zend_hash_update(&g_connections, addr, addr_len, &connection, sizeof(connection), &pDest);
+	}
+	else {
+		connection = *((Connection **)pDest);
+		//syslog(LOG_DEBUG, "connection found: %s, %p", addr, connection);
+	}
+
 	object_init_ex(return_value, connection_ce);
-	zend_update_property_long(connection_ce, return_value, "handle", 6, (long)Connection_new(addr));
+	zend_update_property_long(connection_ce, return_value, "handle", 6, (long)connection);
+}
+
+int _shutdown_free_connection(void *pDest TSRMLS_DC)
+{
+	Connection *connection = *((Connection **)pDest);
+	Connection_free(connection);
+	//syslog(LOG_DEBUG, "connection freed: %p", connection);
+	return ZEND_HASH_APPLY_KEEP;
 }
 
 PHP_METHOD(Redis, create_batch)
@@ -267,8 +289,8 @@ PHP_METHOD(Redis, dispatch)
 
 function_entry redis_methods[] = {
     PHP_ME(Redis,  create_ketama,           NULL, ZEND_ACC_PUBLIC)
-    PHP_ME(Redis,  create_connection,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Redis,  create_batch,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Redis,  get_connection,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Redis,  dispatch,           NULL, ZEND_ACC_PUBLIC)
     {NULL, NULL, NULL}
 };
@@ -294,6 +316,9 @@ PHP_MINIT_FUNCTION(redis)
     INIT_CLASS_ENTRY(ce, "_Libredis_Redis", redis_methods);
     redis_ce = zend_register_internal_class(&ce TSRMLS_CC);
 
+    //init hashtable for persistent connections
+    zend_hash_init(&g_connections, 128, NULL, NULL, 1);
+
     g_module.size = sizeof(Module);
     g_module.alloc_malloc = __zend_malloc;
     g_module.alloc_realloc = __zend_realloc;
@@ -307,6 +332,12 @@ PHP_MINIT_FUNCTION(redis)
 
 PHP_MSHUTDOWN_FUNCTION(redis)
 {
+	//free the persistent connections
+	zend_hash_apply(&g_connections, _shutdown_free_connection);
+	zend_hash_destroy(&g_connections);
+	//todo check if the above really release all resource, what about the items in the hashtable?, are they released
+	//hash destroy?
+
 	Module_free();
 
 	syslog(LOG_DEBUG, "libredis module shutdown complete, final alloc: %d\n", g_module.allocated);
