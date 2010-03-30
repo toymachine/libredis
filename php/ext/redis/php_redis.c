@@ -18,6 +18,7 @@ zend_class_entry *batch_ce;
 zend_class_entry *ketama_ce;
 zend_class_entry *connection_ce;
 
+Module g_module;
 /**************** KETAMA ***********************/
 
 
@@ -270,7 +271,11 @@ PHP_MINIT_FUNCTION(redis)
     batch_ce = zend_register_internal_class(&ce TSRMLS_CC);
     zend_declare_property_long(batch_ce, "handle", 6, 0, ZEND_ACC_PRIVATE);
 
-    Module_init();
+    g_module.size = sizeof(Module);
+    g_module.alloc_malloc = __zend_malloc;
+    g_module.alloc_realloc = __zend_realloc;
+    g_module.alloc_free = free;
+    Module_init(&g_module);
 
     return SUCCESS;
 }

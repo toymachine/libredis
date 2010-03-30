@@ -1,7 +1,18 @@
 #ifndef REDIS_H
 #define REDIS_H
 
-void Module_init();
+#include <string.h>
+
+typedef struct _Module
+{
+	size_t size; //size of module structure
+	void * (*alloc_malloc)(size_t size);
+    void * (*alloc_realloc)(void *ptr, size_t size);
+    void (*alloc_free)(void *ptr);
+    size_t allocated;
+} Module;
+
+void Module_init(Module *module);
 void Module_dispatch();
 void Module_free();
 

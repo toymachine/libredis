@@ -1,6 +1,5 @@
 - php module shutdown not done?, why not, debug show sighup or something
-- php persistent connections/ketama's
-- php alloc
+- php persistent connections/ketama's (profile ketama first)
 
 - socket creation errors
 - connection timeout

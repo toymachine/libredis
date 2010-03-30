@@ -4,28 +4,28 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-extern size_t allocated;
+#include "module.h"
 
 static inline void *_Alloc_alloc(size_t size)
 {
-	allocated += size;
-	DEBUG(("alloc real: %d total now: %d\n", size, allocated));
-	return malloc(size);
+	g_module->allocated += size;
+	DEBUG(("alloc real: %d total now: %d\n", size, g_module->allocated));
+	return g_module->alloc_malloc(size);
 }
 
 static inline void _Alloc_free(void *obj, size_t size)
 {
-	free(obj);
-	allocated -= size;
-	DEBUG(("dealloc real: %d total now: %d\n", size, allocated));
+	g_module->alloc_free(obj);
+	g_module->allocated -= size;
+	DEBUG(("dealloc real: %d total now: %d\n", size, g_module->allocated));
 }
 
 static inline void *_Alloc_realloc(void *obj, size_t new_size, size_t old_size)
 {
-	allocated -= old_size;
-	allocated += new_size;
-	DEBUG(("realloc real: %d total now: %d\n", new_size, allocated));
-	return realloc(obj, new_size);
+	g_module->allocated -= old_size;
+	g_module->allocated += new_size;
+	DEBUG(("realloc real: %d total now: %d\n", new_size, g_module->allocated));
+	return g_module->alloc_realloc(obj, new_size);
 }
 
 #define Alloc_alloc_T(T) (T *) _Alloc_alloc(sizeof(T))

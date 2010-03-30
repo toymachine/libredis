@@ -77,7 +77,7 @@ function test_mget()
 
     //$N = 200000;
     $N = 20000;
-    $M = 100;
+    $M = 200;
     
     $connection1 = get_connection("127.0.0.1:6379");;
     $connection2 = get_connection("127.0.0.1:6380");
@@ -100,6 +100,7 @@ function test_mget()
     }
     $end = microtime(true);
     echo "per/sec ", $N * $M / ($end - $start), PHP_EOL;
+    echo "msec per mget ", ($end - $start) / $N * 1000.0, PHP_EOL;
 }
 
 function _test_simple($connection, $key)
