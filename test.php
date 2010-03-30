@@ -19,16 +19,17 @@ function test_ketama() {
 }
 
 
+//simple connection manager
 function get_connection($addr)
 {
-	if(!isset($connections[$addr])) {
-		$connection[$addr] = new Redis_Connection($addr);
-	} 
-	return $connection[$addr];	
+    static $connections = array();
+    if(!isset($connections[$addr])) {
+        $connections[$addr] = new Redis_Connection($addr);
+    } 
+    return $connections[$addr];  
 }
 
 function mget($keys, $ketama) {
-	$connections = array();
 	$batches = array();
 	$batch_keys = array();
     //add all keys to batches
@@ -48,10 +49,7 @@ function mget($keys, $ketama) {
     foreach($batches as $server_ordinal=>$batch) {
         $batch->write("\r\n", 1);
         $server_addr = $ketama->get_server_addr($server_ordinal);
-		if(!isset($connections[$server_addr])) {
-			$connections[$server_addr] = new Redis_Connection($server_addr);
-		} 
-		$connection = $connections[$server_addr];	
+		$connection = get_connection($server_addr);	
         $connection->execute($batch);
     }
     //handle events until all complete
@@ -66,19 +64,25 @@ function mget($keys, $ketama) {
     	    $results[$key] = $reply_value;
 		}
 	}
+	
 	return $results;
 }
 
 function test_mget()
 {
     $ketama = new Redis_Ketama();
-    $ketama->add_server("127.0.0.1", 6379, 300);
-    $ketama->add_server("127.0.0.1", 6380, 300);
+    $ketama->add_server("127.0.0.1", 6379, 100);
+    $ketama->add_server("127.0.0.1", 6380, 100);
     $ketama->create_continuum();
 
-    $connection1 = new Redis_Connection("127.0.0.1:6379");
-    $connection2 = new Redis_Connection("127.0.0.1:6380");
-    for($i = 0; $i < 100; $i++) {
+    //$N = 200000;
+    $N = 20000;
+    $M = 100;
+    
+    $connection1 = get_connection("127.0.0.1:6379");;
+    $connection2 = get_connection("127.0.0.1:6380");
+    $keys = array();
+    for($i = 0; $i < $M; $i++) {
         $key = "piet$i";
         $value = "blaat$i";
         $len = strlen($value);
@@ -86,11 +90,16 @@ function test_mget()
         $connection1->execute($batch, true);
         $batch = new Redis_Batch("SET $key $len\r\n$value\r\n", 1);
         $connection2->execute($batch, true);
+        $keys[] = $key;
     }
     
-    for($i = 0; $i < 100; $i++) {
-	   mget(array("piet1", "piet2", "piet3", "piet4", "xx3"), $ketama);
+    $start = microtime(true);
+    for($i = 0; $i < $N; $i++) {
+        mget($keys, $ketama);
+        //print_r(mget($keys, $ketama));
     }
+    $end = microtime(true);
+    echo "per/sec ", $N * $M / ($end - $start), PHP_EOL;
 }
 
 function _test_simple($connection, $key)
@@ -108,6 +117,13 @@ function test_simple() {
 	for($i = 0; $i < 100; $i++) {
 		_test_simple($connection, "library");
 	}
+}
+
+function test_destroy() {
+    //$connection = new Redis_Connection("127.0.0.1:6379");
+    $connection = get_connection("127.0.0.1:6379");
+    $connection = get_connection("127.0.0.1:6379");
+    $connection = get_connection("127.0.0.1:6379");
 }
 
 function test_integer_reply()
@@ -128,13 +144,10 @@ function test_integer_reply()
 	}
 }
 
-$batch = new Redis_Batch();
-for($i = 0; $i < 10000; $i++) {
-  $batch->write("INCR");  
-}
 //test_ketama();
 //test_simple();
-//test_mget();
+test_mget();
+//test_destroy();
 //test_integer_reply();
 //echo "done...!", PHP_EOL;
 ?>

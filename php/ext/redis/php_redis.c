@@ -18,9 +18,6 @@ zend_class_entry *batch_ce;
 zend_class_entry *ketama_ce;
 zend_class_entry *connection_ce;
 
-
-//TODO use read-only zend_get_parameters_ex where possible
-
 /**************** KETAMA ***********************/
 
 
@@ -217,16 +214,7 @@ PHP_METHOD(Batch, next_reply)
 
 	ZVAL_LONG(reply_type, c_reply_type);
 
-	/*
-	RT_NONE = 0,
-    RT_OK = 1,
-	RT_ERROR = 2,
-    RT_BULK_NIL = 3,
-    RT_BULK = 4,
-    RT_MULTIBULK_NIL = 5,
-    RT_MULTIBULK = 6
-    RT_INTEGER = 7
-	*/
+	zval_dtor(reply_value);
 
     if(c_reply_type == RT_OK ||
        c_reply_type == RT_ERROR ||
@@ -240,7 +228,6 @@ PHP_METHOD(Batch, next_reply)
     }
     else if(c_reply_type == RT_INTEGER) {
     	char *end_value = c_reply_value + c_reply_length;
-    	//ZVAL_STRINGL(reply_value, c_reply_value, c_reply_length, 1);
     	ZVAL_LONG(reply_value, strtol(c_reply_value, &end_value, 10));
     }
     else {
