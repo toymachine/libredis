@@ -89,31 +89,7 @@ Connection *Connection_new(const char *in_addr)
 	}
 	DEBUG(("Connection ip: '%s', port: %d\n", addr, port));
 
-	//create socket
-	connection->sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if(connection->sockfd == -1) {
-		SETERROR(("Could not create socket for Connection"));
-		Connection_free(connection);
-		return NULL;
-	}
-	//prepare libevent structures
-	event_set(&connection->event_read, connection->sockfd, EV_READ, &Connection_handle_event, (void *)connection);
-	event_set(&connection->event_write, connection->sockfd, EV_WRITE, &Connection_handle_event, (void *)connection);
-
-	//set socket in non-blocking mode
-	int flags;
-	if ((flags = fcntl(connection->sockfd, F_GETFL, 0)) < 0)
-	{
-		SETERROR(("Could not get socket flags for Connection"));
-		Connection_free(connection);
-		return NULL;
-	}
-	if (fcntl(connection->sockfd, F_SETFL, flags | O_NONBLOCK) < 0)
-	{
-		SETERROR(("Could not set socket in non-blocking mode for Connection"));
-		Connection_free(connection);
-		return NULL;
-	}
+	connection->sockfd = 0;
 
 	//
 	return connection;
@@ -131,8 +107,43 @@ void Connection_free(Connection *connection)
 	Alloc_free_T(connection, Connection);
 }
 
+int Connection_create_socket(Connection *connection)
+{
+	assert(connection != NULL);
+	assert(CS_CLOSED == connection->state);
+
+	//create socket
+	connection->sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if(connection->sockfd == -1) {
+		Connection_abort(connection, "could not create socket");
+		return -1;
+	}
+
+	//prepare libevent structures
+	event_set(&connection->event_read, connection->sockfd, EV_READ, &Connection_handle_event, (void *)connection);
+	event_set(&connection->event_write, connection->sockfd, EV_WRITE, &Connection_handle_event, (void *)connection);
+
+	//set socket in non-blocking mode
+	int flags;
+	if ((flags = fcntl(connection->sockfd, F_GETFL, 0)) < 0)
+	{
+		Connection_abort(connection, "could not get socket flags for");
+		return -1;
+	}
+	if (fcntl(connection->sockfd, F_SETFL, flags | O_NONBLOCK) < 0)
+	{
+		Connection_abort(connection, "could not set socket to non-blocking mode");
+		return -1;
+	}
+	return 0;
+}
+
 void Connection_abort(Connection *connection, const char *format,  ...)
 {
+	if(CS_ABORTED == connection->state) {
+		return;
+	}
+
 	DEBUG(("Connection aborting\n"));
 
 	//abort batch
@@ -146,13 +157,19 @@ void Connection_abort(Connection *connection, const char *format,  ...)
 	Batch_abort(connection->current_batch, error2);
 	connection->current_batch = NULL;
 
-	//unset outstanding events
-	event_del(&connection->event_read);
-	event_del(&connection->event_write);
+	if(CS_CONNECTED == connection->state ||
+	   CS_CONNECTING == connection->state) {
+		assert(connection->sockfd > 0);
 
-	//close the socket
-	close(connection->sockfd);
+		//unset outstanding events
+		event_del(&connection->event_read);
+		event_del(&connection->event_write);
 
+		//close the socket
+		close(connection->sockfd);
+	}
+
+	connection->sockfd = 0;
 	connection->state = CS_ABORTED;
 
 	DEBUG(("Connection aborted: %s\n", error2));
@@ -210,6 +227,11 @@ void Connection_write_data(Connection *connection)
 	}
 
 	if(CS_CLOSED == connection->state) {
+		if(-1 == Connection_create_socket(connection)) {
+			//already aborted in create_socket
+			return;
+		}
+		//connect the socket
 		if(-1 == connect(connection->sockfd, (struct sockaddr *) &connection->sa, sizeof(struct sockaddr))) {
 			//open the connection
 			if(EINPROGRESS == errno) {

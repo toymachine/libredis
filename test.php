@@ -1,7 +1,7 @@
 <?php
 
-//$ip = "127.0.0.1";
-$ip = "192.168.13.92";
+$ip = "127.0.0.1";
+//$ip = "192.168.13.92";
 
 $libredis = Libredis();
 
@@ -170,7 +170,7 @@ function test_connections()
 }
 
 //test_ketama();
-//test_simple();
+test_simple();
 //test_mget();
 //test_destroy();
 //test_integer_reply();
