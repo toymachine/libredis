@@ -21,7 +21,7 @@ struct _ReplyParser
 
 };
 
-int ReplyParser_reset(ReplyParser *rp)
+void ReplyParser_reset(ReplyParser *rp)
 {  
     rp->p = 0;
     rp->cs = 0;  
@@ -30,23 +30,27 @@ int ReplyParser_reset(ReplyParser *rp)
 
     rp->multibulk_count = 0;
     rp->multibulk_reply = NULL;
-
-    return 0;   
 }
 
 ReplyParser *ReplyParser_new()
 {
 	DEBUG(("alloc ReplyParser\n"));
 	ReplyParser *rp = Alloc_alloc_T(ReplyParser);
+	if(rp == NULL) {
+		SETERROR(("Out of memory while allocating ReplyParser"));
+		return NULL;
+	}
 	ReplyParser_reset(rp);
 	return rp;
 }
 
-int ReplyParser_free(ReplyParser *rp)
+void ReplyParser_free(ReplyParser *rp)
 {
+	if(rp == NULL) {
+		return;
+	}
 	DEBUG(("dealloc ReplyParser\n"));
 	Alloc_free_T(rp, ReplyParser);
-	return 0;
 }
 
 

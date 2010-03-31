@@ -9,6 +9,7 @@
 #define EVENT99_H_
 
 #include <stdint.h>
+#include <sys/types.h>
 
 typedef uint8_t u_char;
 
