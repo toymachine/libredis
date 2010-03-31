@@ -85,7 +85,7 @@ function test_mget()
     $ketama->create_continuum();
 
     //$N = 200000;
-    $N = 20000;
+    $N = 20;
     $M = 200;
     
     $connection1 = $libredis->get_connection("127.0.0.1:6379");;
