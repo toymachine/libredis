@@ -214,11 +214,13 @@ char *Batch_error(Batch *batch)
 
 void Batch_abort(Batch *batch, const char *error)
 {
+	DEBUG(("Batch abort\n"));
 	int written = snprintf(batch->error, MAX_ERROR_SIZE, "%s", error);
 	if(written > MAX_ERROR_SIZE) {
 		written = MAX_ERROR_SIZE;
 	}
 	while(Batch_has_command(batch)) {
+		DEBUG(("Batch abort, adding error reply\n"));
 		Batch_add_reply(batch, Reply_new(RT_ERROR, batch->error, 0, written));
 	}
 	batch->has_error = 1;

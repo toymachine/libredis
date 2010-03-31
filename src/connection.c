@@ -144,8 +144,6 @@ void Connection_abort(Connection *connection, const char *format,  ...)
 		return;
 	}
 
-	DEBUG(("Connection aborting\n"));
-
 	//abort batch
 	char error1[MAX_ERROR_SIZE];
 	char error2[MAX_ERROR_SIZE];
@@ -154,6 +152,9 @@ void Connection_abort(Connection *connection, const char *format,  ...)
 	vsnprintf(error1, MAX_ERROR_SIZE, format, args);
 	va_end(args);
 	snprintf(error2, MAX_ERROR_SIZE, "Connection error %s [addr: %s]", error1, connection->addr);
+
+	DEBUG(("Connection aborting: %s\n", error2));
+
 	Batch_abort(connection->current_batch, error2);
 	connection->current_batch = NULL;
 
@@ -172,7 +173,7 @@ void Connection_abort(Connection *connection, const char *format,  ...)
 	connection->sockfd = 0;
 	connection->state = CS_ABORTED;
 
-	DEBUG(("Connection aborted: %s\n", error2));
+	DEBUG(("Connection aborted\n"));
 }
 
 void Connection_execute(Connection *connection, Batch *batch)
@@ -356,7 +357,12 @@ void Connection_handle_event(int fd, short flags, void *data)
 			connection->state, flags, (flags & EV_READ) ? 1 : 0, (flags & EV_WRITE) ? 1 : 0, (flags & EV_TIMEOUT) ? 1 : 0 ));
 
 	if(flags & EV_TIMEOUT) {
-		Connection_abort(connection, "read/write timeout");
+		if(CS_CONNECTING == connection->state) {
+			Connection_abort(connection, "connect timeout");
+		}
+		else {
+			Connection_abort(connection, "read/write timeout");
+		}
 		return;
 	}
 

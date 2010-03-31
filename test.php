@@ -72,7 +72,9 @@ function mget($keys, $ketama) {
 	    $batch->next_reply(&$mb_reply_type, &$mb_reply_value, &$mb_reply_length);
 	    foreach($batch_keys[$server_ordinal] as $key) {
     	    $batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
-    	    $results[$key] = $reply_value;
+    	    if($reply_type == 4) {
+	    	    $results[$key] = $reply_value;
+    	    }
 		}
 	}
 	
@@ -89,7 +91,7 @@ function test_mget()
     $ketama->create_continuum();
 
     //$N = 200000;
-    $N = 20;
+    $N = 2000;
     $M = 200;
     
     $connection1 = $libredis->get_connection("$ip:6379");;
@@ -170,17 +172,19 @@ function test_connections()
 }
 
 //test_ketama();
-test_simple();
-//test_mget();
+//test_simple();
+test_mget();
 //test_destroy();
 //test_integer_reply();
 //test_connections();
 //echo "done...!", PHP_EOL;
 
+/*
 $cnn = $libredis->get_connection('192.168.13.93');
 $batch = $libredis->create_batch("GET library\r\n", 1);
 $cnn->execute($batch, true);
 $batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
 echo "$reply_type $reply_value $reply_length";
+*/
 
 ?>
