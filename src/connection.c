@@ -18,6 +18,8 @@
 #include "parser.h"
 #include "batch.h"
 
+#define ADDR_SIZE 22 //max size of ip:port addr string
+
 typedef enum _ConnectionState
 {
     CS_CLOSED = 0,
@@ -28,7 +30,8 @@ typedef enum _ConnectionState
 
 struct _Connection
 {
-	char addr[22];
+	char addr[ADDR_SIZE];
+	struct sockaddr_in sa; //parsed addres
 	int sockfd;
 	ConnectionState state;
 	struct event event_read;
@@ -39,51 +42,113 @@ struct _Connection
 
 void Connection_handle_event(int fd, short flags, void *data);
 
-Connection *Connection_new(const char *addr)
+Connection *Connection_new(const char *in_addr)
 {
 	DEBUG(("alloc Connection\n"));
 	Connection *connection = Alloc_alloc_T(Connection);
+	if(connection == NULL) {
+		SETERROR(("Out of memory while allocating Connection"));
+		return NULL;
+	}
 	connection->state = CS_CLOSED;
-
 	connection->current_batch = NULL;
 	connection->parser = ReplyParser_new();
+	if(connection->parser == NULL) {
+		Connection_free(connection);
+		return NULL;
+	}
 
-	//socket stuff:
-	snprintf(connection->addr, 22, "%s", addr);
-	DEBUG(("Connection addr: '%s'\n", connection->addr));
+	//copy socket addr
+	if(ADDR_SIZE < snprintf(connection->addr, ADDR_SIZE, "%s", in_addr)) {
+		SETERROR(("Invalid address for Connection"));
+		Connection_free(connection);
+		return NULL;
+	}
+
+	//parse addr
+	int port = DEFAULT_IP_PORT;
+	char *pport;
+	char addr[ADDR_SIZE];
+	DEBUG(("parsing connection addr: %s\n", connection->addr));
+	if(NULL == (pport = strchr(connection->addr, ':'))) {
+		port = DEFAULT_IP_PORT;
+		snprintf(addr, ADDR_SIZE, "%s", connection->addr);
+	}
+	else {
+		port = atoi(pport + 1);
+		snprintf(addr, (pport - connection->addr + 1), "%s", connection->addr);
+	}
+	connection->sa.sin_family = AF_INET;
+	connection->sa.sin_port = htons(port);
+	if(!inet_pton(AF_INET, addr, &connection->sa.sin_addr)) {
+		SETERROR(("Could not parse ip address"));
+		Connection_free(connection);
+		return NULL;
+	}
+	DEBUG(("Connection ip: '%s', port: %d\n", addr, port));
+
+	//create socket
 	connection->sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if(connection->sockfd == -1) {
-		printf("could not create socket\n");
-		abort();
+		SETERROR(("Could not create socket for Connection"));
+		Connection_free(connection);
+		return NULL;
 	}
+	//prepare libevent structures
 	event_set(&connection->event_read, connection->sockfd, EV_READ, &Connection_handle_event, (void *)connection);
 	event_set(&connection->event_write, connection->sockfd, EV_WRITE, &Connection_handle_event, (void *)connection);
+
 	//set socket in non-blocking mode
 	int flags;
 	if ((flags = fcntl(connection->sockfd, F_GETFL, 0)) < 0)
 	{
-		printf("TODO error on nonblock fcntl\n");
-		abort();
+		SETERROR(("Could not get socket flags for Connection"));
+		Connection_free(connection);
+		return NULL;
 	}
 	if (fcntl(connection->sockfd, F_SETFL, flags | O_NONBLOCK) < 0)
 	{
-		printf("TODO error on nonblock fcntl\n");
-		abort();
+		SETERROR(("Could not set socket in non-blocking mode for Connection"));
+		Connection_free(connection);
+		return NULL;
 	}
-	//set nodelay option
-	/*
-	int nodelay = 1;
-	setsockopt(connection->sockfd, SOL_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
-	*/
 
+	//
 	return connection;
 }
 
 void Connection_free(Connection *connection)
 {
-	ReplyParser_free(connection->parser);
+	if(connection == NULL) {
+		return;
+	}
+	if(connection->parser != NULL) {
+		ReplyParser_free(connection->parser);
+	}
 	DEBUG(("dealloc Connection\n"));
 	Alloc_free_T(connection, Connection);
+}
+
+void Connection_execute(Connection *connection, Batch *batch)
+{
+	DEBUG(("Connection exec\n"));
+
+	connection->current_batch = batch;
+	ReplyParser_reset(connection->parser);
+	Buffer_flip(Batch_write_buffer(batch));
+
+	DEBUG(("Connection exec write buff:\n"));
+#ifndef NDEBUG
+	Buffer_dump(Batch_write_buffer(batch), 128);
+#endif
+
+	//kick off writing:
+	Connection_write_data(connection);
+
+	//kick off reading when socket becomes readable
+	if(CS_CONNECTED == connection->state) {
+		Connection_event_add(connection, &connection->event_read, 0, 400000);
+	}
 }
 
 void Connection_event_add(Connection *connection, struct event *event, long int tv_sec, long int tv_usec)
@@ -91,36 +156,10 @@ void Connection_event_add(Connection *connection, struct event *event, long int 
 	struct timeval tv;
 	tv.tv_sec = tv_sec;
 	tv.tv_usec = tv_usec;
-	int res = event_add(event, &tv);
-	DEBUG(("connection ev add: fd: %d, type: %c, res: %d\n", connection->sockfd, event == &connection->event_read ? 'R' : 'W', res));
-}
-
-
-
-int Connection_connect(Connection *connection)
-{
-	int port = DEFAULT_IP_PORT;
-	char *pport;
-	char addr[22];
-	DEBUG(("parsing connection addr: %s\n", connection->addr));
-	if(NULL == (pport = strchr(connection->addr, ':'))) {
-		printf("TODO add default port");
-		abort();
+	if(-1 == event_add(event, &tv)) {
+		abort();//TODO
 	}
-	else {
-		port = atoi(pport + 1);
-		snprintf(addr, (pport - connection->addr + 1), "%s", connection->addr);
-	}
-	DEBUG(("connect to port: %d\n", port));
-	DEBUG(("connect to addr: '%s'\n", addr));
-	struct sockaddr_in sa;
-	sa.sin_family = AF_INET;
-	sa.sin_port = htons(port);
-	if(!inet_pton(AF_INET, addr, &sa.sin_addr)) {
-		printf("could not parse connection addr\n");
-		abort();
-	}
-	return connect(connection->sockfd, (struct sockaddr *) &sa, sizeof(struct sockaddr));
+	DEBUG(("connection ev add: fd: %d, type: %c, res: %d\n", connection->sockfd, event == &connection->event_read ? 'R' : 'W'));
 }
 
 void Connection_write_data(Connection *connection)
@@ -129,7 +168,7 @@ void Connection_write_data(Connection *connection)
 	assert(connection->current_batch != NULL);
 
 	if(CS_CLOSED == connection->state) {
-		if(-1 == Connection_connect(connection)) {
+		if(-1 == connect(connection->sockfd, (struct sockaddr *) &connection->sa, sizeof(struct sockaddr))) {
 			//open the connection
 			if(EINPROGRESS == errno) {
 				//normal async connect
@@ -185,30 +224,6 @@ void Connection_write_data(Connection *connection)
 			}
 		}
 	}
-}
-
-int Connection_execute(Connection *connection, Batch *batch)
-{
-	DEBUG(("Connection exec\n"));
-
-	connection->current_batch = batch;
-	ReplyParser_reset(connection->parser);
-	Buffer_flip(Batch_write_buffer(batch));
-
-	DEBUG(("Connection exec write buff:\n"));
-#ifndef NDEBUG
-	Buffer_dump(Batch_write_buffer(batch), 128);
-#endif
-
-	//kick off writing:
-	Connection_write_data(connection);
-
-	//kick off reading when socket becomes readable
-	if(CS_CONNECTED == connection->state) {
-		Connection_event_add(connection, &connection->event_read, 0, 400000);
-	}
-
-	return 0;
 }
 
 void Connection_read_data(Connection *connection)

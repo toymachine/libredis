@@ -3,6 +3,8 @@
 
 #include <string.h>
 
+#define MAX_ERROR_SIZE 255
+
 typedef struct _Module
 {
 	size_t size; //size of module structure
@@ -10,6 +12,7 @@ typedef struct _Module
     void * (*alloc_realloc)(void *ptr, size_t size);
     void (*alloc_free)(void *ptr);
     size_t allocated;
+    char error[MAX_ERROR_SIZE];
 } Module;
 
 void Module_init(Module *module);
@@ -34,7 +37,7 @@ typedef enum _ReplyType
 
 Connection *Connection_new(const char *addr);
 void Connection_free(Connection *connection);
-int Connection_execute(Connection *connection, Batch *batch);
+void Connection_execute(Connection *connection, Batch *batch);
 
 Batch *Batch_new();
 void Batch_free(Batch *batch);

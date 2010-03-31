@@ -19,6 +19,8 @@
 #define DEBUG(args)
 #endif
 
+#define SETERROR(args) (snprintf(g_module->error, MAX_ERROR_SIZE, args))
+
 #define CR '\r'
 #define LF '\n'
 #define CRLF '\r\n'

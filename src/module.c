@@ -4,23 +4,27 @@
 #include "batch.h"
 
 Module *g_module;
+Module g_default_module;
 
 void Module_init(Module *module)
 {
 	if(module == NULL) {
-		abort();
+		g_module = &g_default_module;
+	}
+	else {
+		g_module = module;
 	}
 	DEBUG(("Module init\n"));
-	if(module->alloc_malloc == NULL) {
-		module->alloc_malloc = malloc;
+	if(g_module->alloc_malloc == NULL) {
+		g_module->alloc_malloc = malloc;
 	}
-	if(module->alloc_realloc == NULL) {
-		module->alloc_realloc = realloc;
+	if(g_module->alloc_realloc == NULL) {
+		g_module->alloc_realloc = realloc;
 	}
-	if(module->alloc_free == NULL) {
-		module->alloc_free = free;
+	if(g_module->alloc_free == NULL) {
+		g_module->alloc_free = free;
 	}
-	g_module = module;
+
 	event_init();
 }
 

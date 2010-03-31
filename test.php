@@ -124,9 +124,9 @@ function _test_simple($connection, $key)
 function test_simple() {
 	
     global $libredis;
-	$connection = $libredis->get_connection("127.0.0.1:6379");
+	$connection = $libredis->get_connection("127.0.0.1");
 	
-	for($i = 0; $i < 100; $i++) {
+	for($i = 0; $i < 1; $i++) {
 		_test_simple($connection, "library");
 	}
 }
