@@ -1,3 +1,6 @@
+CC=gcc
+CFLAGS=-DNDEBUG -I"./include" -O3 -pedantic -Wall -c -fmessage-length=0 -std=gnu99
+
 REDIS_HOME=/home/henk/workspace/libredis
 
 php_ext:
@@ -24,4 +27,10 @@ use_release:
 	cd Release; make clean; make
 	cd lib; ln -s ../Release/libredis.so libredis.so
 
+libredis: src/alloc.o src/batch.o src/connection.o src/ketama.o src/md5.o src/module.o src/parser.o src/buffer.o
+	gcc -shared -o"lib/libredis.so" ./src/alloc.o ./src/batch.o ./src/buffer.o ./src/connection.o ./src/ketama.o ./src/md5.o ./src/module.o ./src/parser.o   -levent -lm
 
+clean:
+	cd src; rm -rf *.o
+
+	
