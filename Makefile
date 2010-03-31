@@ -25,5 +25,5 @@ libredis: src/alloc.o src/batch.o src/connection.o src/ketama.o src/md5.o src/mo
 
 clean:
 	cd src; rm -rf *.o
-
+	rm -rf lib
 	

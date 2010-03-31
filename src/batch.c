@@ -102,11 +102,11 @@ int Reply_dump(Reply *reply) {
 	ReplyType reply_type = reply->type;
 	switch(reply_type) {
 	case RT_OK: {
-		printf("ok reply: %.*s\n", reply->len, Reply_data(reply));
+		printf("ok reply: %.*s\n", (int)reply->len, Reply_data(reply));
 		break;
 	}
 	case RT_BULK: {
-		printf("bulk reply: %.*s\n", reply->len, Reply_data(reply));
+		printf("bulk reply: %.*s\n", (int)reply->len, Reply_data(reply));
 		break;
 	}
 	case RT_BULK_NIL: {
@@ -114,13 +114,13 @@ int Reply_dump(Reply *reply) {
 		break;
 	}
 	case RT_MULTIBULK: {
-		printf("multi bulk reply, count: %d\n", reply->len);
+		printf("multi bulk reply, count: %d\n", (int)reply->len);
 		Reply *child;
 		list_for_each_entry(child, &reply->children, list) {
 			assert(child != NULL);
 			ReplyType child_type = child->type;
 			if(RT_BULK == child_type) {
-				printf("\tbulk reply: %.*s\n", child->len, Reply_data(child));
+				printf("\tbulk reply: %.*s\n", (int)child->len, Reply_data(child));
 			}
 			else if(RT_BULK_NIL == child_type) {
 				printf("\tbulk nil\n");

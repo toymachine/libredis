@@ -74,7 +74,7 @@ int Buffer_dump(Buffer *buffer, int limit)
 	if(limit == -1) {
 		limit = buffer->capacity;
 	}
-	printf("buffer cap: %d, limit: %d, pos: %d\n", buffer->capacity, buffer->limit, buffer->position);
+	printf("buffer cap: %d, limit: %d, pos: %d\n", (int)buffer->capacity, (int)buffer->limit, (int)buffer->position);
 	for(i = 0; i < limit; i+=16) {
 		for(j = 0; j < 16; j++) {
 			printf("%02X ", ((unsigned char *)buffer->data)[i + j]);
