@@ -176,4 +176,11 @@ test_simple();
 //test_integer_reply();
 //test_connections();
 //echo "done...!", PHP_EOL;
+
+$cnn = $libredis->get_connection('192.168.13.93');
+$batch = $libredis->create_batch("GET library\r\n", 1);
+$cnn->execute($batch, true);
+$batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
+echo "$reply_type $reply_value $reply_length";
+
 ?>
