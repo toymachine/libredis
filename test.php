@@ -124,10 +124,10 @@ function _test_simple($connection, $key)
 function test_simple() {
 	
     global $libredis;
-	$connection = $libredis->get_connection("127.0.0.1");
+	$connection = $libredis->get_connection("64.4.31.252:80");
 	
 	for($i = 0; $i < 1; $i++) {
-		_test_simple($connection, "library");
+		print_r(_test_simple($connection, "library"));
 	}
 }
 
@@ -165,8 +165,8 @@ function test_connections()
 }
 
 //test_ketama();
-//test_simple();
-test_mget();
+test_simple();
+//test_mget();
 //test_destroy();
 //test_integer_reply();
 //test_connections();

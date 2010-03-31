@@ -18,4 +18,6 @@ void Batch_add_reply(Batch *batch, Reply *reply);
 Buffer *Batch_read_buffer(Batch *batch);
 Buffer *Batch_write_buffer(Batch *batch);
 
+void Batch_abort(Batch *batch, const char *error);
+
 #endif

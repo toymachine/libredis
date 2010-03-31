@@ -30,8 +30,6 @@ void ReplyParser_reset(ReplyParser *rp)
 
     rp->multibulk_count = 0;
     rp->multibulk_reply = NULL;
-
-    return 0;   
 }
 
 ReplyParser *ReplyParser_new()

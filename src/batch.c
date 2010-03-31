@@ -22,6 +22,10 @@ struct _Batch
 	//simple stack for iterating results
 	int current_reply_sp;
 	struct list_head *current_reply[BATCH_REPLY_ITERATOR_STACK_SIZE * 2];
+
+	//error for aborted batch
+	char error[MAX_ERROR_SIZE];
+	int has_error;
 };
 
 struct _Reply
@@ -148,6 +152,9 @@ Batch *Batch_new()
 	batch->current_reply_sp = 0;
 	batch->current_reply[0] = &batch->reply_queue;
 	batch->current_reply[1] = &batch->reply_queue;
+
+	batch->has_error = 0;
+
 	return batch;
 }
 
@@ -169,6 +176,7 @@ void _Batch_free(Batch *batch, int final)
 		Buffer_fill(batch->write_buffer, (Byte)0xEA);
 #endif
 	}
+	batch->has_error = 0;
 	Batch_list_free(batch, final);
 }
 
@@ -194,6 +202,27 @@ void Batch_add_reply(Batch *batch, Reply *reply)
 	list_add(&reply->list, &batch->reply_queue);
 }
 
+char *Batch_error(Batch *batch)
+{
+	if(batch->has_error) {
+		return batch->error;
+	}
+	else {
+		return NULL;
+	}
+}
+
+void Batch_abort(Batch *batch, const char *error)
+{
+	int written = snprintf(batch->error, MAX_ERROR_SIZE, "%s", error);
+	if(written > MAX_ERROR_SIZE) {
+		written = MAX_ERROR_SIZE;
+	}
+	while(Batch_has_command(batch)) {
+		Batch_add_reply(batch, Reply_new(RT_ERROR, batch->error, 0, written));
+	}
+	batch->has_error = 1;
+}
 
 int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *len)
 {

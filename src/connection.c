@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <assert.h>
 #include <string.h>
 
@@ -24,7 +25,8 @@ typedef enum _ConnectionState
 {
     CS_CLOSED = 0,
     CS_CONNECTING = 1,
-    CS_CONNECTED = 2
+    CS_CONNECTED = 2,
+    CS_ABORTED = 3
 } ConnectionState;
 
 
@@ -129,11 +131,43 @@ void Connection_free(Connection *connection)
 	Alloc_free_T(connection, Connection);
 }
 
+void Connection_abort(Connection *connection, const char *format,  ...)
+{
+	DEBUG(("Connection aborting\n"));
+
+	//abort batch
+	char error1[MAX_ERROR_SIZE];
+	char error2[MAX_ERROR_SIZE];
+	va_list args;
+	va_start(args, format);
+	vsnprintf(error1, MAX_ERROR_SIZE, format, args);
+	va_end(args);
+	snprintf(error2, MAX_ERROR_SIZE, "Connection error %s [addr: %s]", error1, connection->addr);
+	Batch_abort(connection->current_batch, error2);
+	connection->current_batch = NULL;
+
+	//unset outstanding events
+	event_del(&connection->event_read);
+	event_del(&connection->event_write);
+
+	//close the socket
+	close(connection->sockfd);
+
+	connection->state = CS_ABORTED;
+
+	DEBUG(("Connection aborted: %s\n", error2));
+}
+
 void Connection_execute(Connection *connection, Batch *batch)
 {
 	DEBUG(("Connection exec\n"));
 
 	connection->current_batch = batch;
+
+	if(CS_ABORTED == connection->state) {
+		connection->state = CS_CLOSED;
+	}
+
 	ReplyParser_reset(connection->parser);
 	Buffer_flip(Batch_write_buffer(batch));
 
@@ -153,19 +187,27 @@ void Connection_execute(Connection *connection, Batch *batch)
 
 void Connection_event_add(Connection *connection, struct event *event, long int tv_sec, long int tv_usec)
 {
+	if(CS_ABORTED == connection->state) {
+		return;
+	}
+
 	struct timeval tv;
 	tv.tv_sec = tv_sec;
 	tv.tv_usec = tv_usec;
 	if(-1 == event_add(event, &tv)) {
-		abort();//TODO
+		Connection_abort(connection, "could not add event");
+		return;
 	}
-	DEBUG(("connection ev add: fd: %d, type: %c, res: %d\n", connection->sockfd, event == &connection->event_read ? 'R' : 'W'));
+	DEBUG(("connection ev add: fd: %d, type: %c\n", connection->sockfd, event == &connection->event_read ? 'R' : 'W'));
 }
 
 void Connection_write_data(Connection *connection)
 {
 	DEBUG(("connection write_data fd: %d\n", connection->sockfd));
 	assert(connection->current_batch != NULL);
+	if(CS_ABORTED == connection->state) {
+		return;
+	}
 
 	if(CS_CLOSED == connection->state) {
 		if(-1 == connect(connection->sockfd, (struct sockaddr *) &connection->sa, sizeof(struct sockaddr))) {
@@ -179,8 +221,8 @@ void Connection_write_data(Connection *connection)
 				return;
 			}
 			else {
-				DEBUG(("abort on connect, errno: %d\n", errno));
-				abort(); //TODO
+				Connection_abort(connection, "connect error 1, errno [%d] %s", errno, strerror(errno));
+				return;
 			}
 		}
 		else {
@@ -194,10 +236,13 @@ void Connection_write_data(Connection *connection)
 		//now check for error to see if we are really connected
 		int error;
 		socklen_t len = sizeof(int);
-		getsockopt(connection->sockfd, SOL_SOCKET, SO_ERROR, &error, &len);
+		if(-1 == getsockopt(connection->sockfd, SOL_SOCKET, SO_ERROR, &error, &len)) {
+			Connection_abort(connection, "getsockopt error for connect result, errno: [%d] %s", errno, strerror(errno));
+			return;
+		}
 		if(error != 0) {
-			printf("connect error: %d\n", error);
-			abort();
+			Connection_abort(connection, "connect error 2, errno: [%d] %s", errno, strerror(errno));
+			return;
 		}
 		else {
 			connection->state = CS_CONNECTED;
@@ -208,6 +253,7 @@ void Connection_write_data(Connection *connection)
 	if(CS_CONNECTED == connection->state) {
 
 		Buffer *buffer = Batch_write_buffer(connection->current_batch);
+		assert(buffer != NULL);
 		while(Buffer_remaining(buffer)) {
 			//still something to write
 			size_t res = Buffer_send(buffer, connection->sockfd);
@@ -218,8 +264,8 @@ void Connection_write_data(Connection *connection)
 					return;
 				}
 				else {
-					printf("send error, errno: %d\n", errno);
-					abort();
+					Connection_abort(connection, "write error, errno: [%d] %s", errno, strerror(errno));
+					return;
 				}
 			}
 		}
@@ -228,6 +274,10 @@ void Connection_write_data(Connection *connection)
 
 void Connection_read_data(Connection *connection)
 {
+	if(CS_ABORTED == connection->state) {
+		return;
+	}
+
 	DEBUG(("connection read data fd: %d\n", connection->sockfd));
 	assert(connection->current_batch != NULL);
 	assert(CS_CONNECTED == connection->state);
@@ -241,8 +291,8 @@ void Connection_read_data(Connection *connection)
 		ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(buffer), Buffer_position(buffer), &reply);
 		switch(rp_res) {
 		case RPR_ERROR: {
-			printf("result parse error!");
-			abort();
+			Connection_abort(connection, "result parse error");
+			return;
 		}
 		case RPR_MORE: {
 			size_t res = Buffer_recv(buffer, connection->sockfd);
@@ -252,11 +302,11 @@ void Connection_read_data(Connection *connection)
 			if(res == -1) {
 				if(errno == EAGAIN) {
 					Connection_event_add(connection, &connection->event_read, 0, 400000);
-					goto exit;
+					return;
 				}
 				else {
-					printf("unhandeld read io err: %d\n", errno);
-					abort(); //TODO
+					Connection_abort(connection, "read error, errno: [%d] %s", errno, strerror(errno));
+					return;
 				}
 			}
 			break;
@@ -266,35 +316,33 @@ void Connection_read_data(Connection *connection)
 			break;
 		}
 		default:
-			printf("unexpected/unhandled rp result: %d\n", rp_res);
-			abort();
+			Connection_abort(connection, "unexpected result parser result, rpres: %d", rp_res);
+			return;
 		}
-
 	}
-exit:
-	DEBUG(("connection read data exit fd: %d\n", connection->sockfd));
 }
 
 void Connection_handle_event(int fd, short flags, void *data)
 {
 	Connection *connection = (Connection *)data;
 
+	if(CS_ABORTED == connection->state) {
+		return;
+	}
+
 	DEBUG(("con event, fd: %d, state: %d, flags: %d, readable: %d, writeable: %d, timeout: %d\n", connection->sockfd,
 			connection->state, flags, (flags & EV_READ) ? 1 : 0, (flags & EV_WRITE) ? 1 : 0, (flags & EV_TIMEOUT) ? 1 : 0 ));
 
+	if(flags & EV_TIMEOUT) {
+		Connection_abort(connection, "Connection r/w timeout");
+		return;
+	}
+
 	if(flags & EV_WRITE) {
-		if(flags & EV_TIMEOUT) {
-			printf("TODO write timeout");
-			abort();
-		}
 		Connection_write_data(connection);
 	}
 
 	if(flags & EV_READ) {
-		if(flags & EV_TIMEOUT) {
-			printf("TODO read timeout");
-			abort();
-		}
 		Connection_read_data(connection);
 	}
 
