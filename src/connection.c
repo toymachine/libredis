@@ -356,7 +356,7 @@ void Connection_handle_event(int fd, short flags, void *data)
 			connection->state, flags, (flags & EV_READ) ? 1 : 0, (flags & EV_WRITE) ? 1 : 0, (flags & EV_TIMEOUT) ? 1 : 0 ));
 
 	if(flags & EV_TIMEOUT) {
-		Connection_abort(connection, "Connection r/w timeout");
+		Connection_abort(connection, "read/write timeout");
 		return;
 	}
 
