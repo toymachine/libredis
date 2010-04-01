@@ -41,7 +41,7 @@ $batch2 = $libredis->create_batch();
 $batch2->set('hello2', 'world2');
 $executor = $libredis->create_executor();
 $executor->add($connection1, $batch1); //associate connection1 with batch1
-$executor->add($connection2, $batch2); //associate connection1 with batch1
+$executor->add($connection2, $batch2); //associate connection1 with batch2
 $executor->execute(); // execute all batches against their corresponding connections in parallel.
 
  
