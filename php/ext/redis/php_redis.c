@@ -11,6 +11,8 @@
 
 #include "redis.h"
 
+#define DEFAULT_TIMEOUT_MS 3000
+
 #define T_fromObj(T, ce, obj) (T *)Z_LVAL_P(zend_read_property(ce, obj, "handle", 6, 0))
 #define T_getThis(T, ce) (T *)Z_LVAL_P(zend_read_property(ce, getThis(), "handle", 6, 0))
 #define T_setThis(p, ce) zend_update_property_long(ce, getThis(), "handle", 6, (long)p);
@@ -116,17 +118,13 @@ PHP_METHOD(Executor, add)
 
 PHP_METHOD(Executor, execute)
 {
-	/*
-	char *key;
-	int key_len;
+	long timeout = DEFAULT_TIMEOUT_MS;
 
-	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "s", &key, &key_len) == FAILURE) {
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "|l", &timeout) == FAILURE) {
 		RETURN_NULL();
 	}
 
-	RETURN_LONG(Ketama_get_server(Ketama_getThis(), key, key_len));
-	*/
-	Executor_execute(Executor_getThis());
+	Executor_execute(Executor_getThis(), timeout);
 }
 
 function_entry executor_methods[] = {
@@ -151,15 +149,16 @@ PHP_METHOD(Connection, __destruct)
 PHP_METHOD(Connection, execute)
 {
 	zval *z_batch;
+	long timeout = DEFAULT_TIMEOUT_MS;
 
-	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "O", &z_batch, batch_ce) == FAILURE) {
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "O|l", &z_batch, batch_ce, &timeout) == FAILURE) {
 		RETURN_NULL();
 	}
 
 	Batch *batch = T_fromObj(Batch, batch_ce, z_batch);
 	Executor *executor = Executor_new();
 	Executor_add(executor, Connection_getThis(), batch);
-	Executor_execute(executor);
+	Executor_execute(executor, timeout);
 	Executor_free(executor);
 }
 

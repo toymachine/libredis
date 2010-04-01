@@ -73,14 +73,15 @@ function mget($keys, $ketama) {
 		$connection = $libredis->get_connection($server_addr);	
         $executor->add($connection, $batch);
     }
-    //handle events until all complete
-	$executor->execute();
+    //execute in parallel until all complete
+	$executor->execute(500);
     //build up results
     $results = array();
     foreach($batches as $server_ordinal=>$batch) {
-    	//read multibulk reply
+    	//read the single multibulk reply
 	    $batch->next_reply(&$mb_reply_type, &$mb_reply_value, &$mb_reply_length);
 	    if(RT_ERROR != $mb_reply_type) {
+	        //read the individual bulk replies in the multibulk reply
     	    foreach($batch_keys[$server_ordinal] as $key) {
         	    $batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
         	    if(RT_BULK == $reply_type) {
@@ -103,7 +104,7 @@ function test_mget()
     $ketama->create_continuum();
 
     //$N = 200000;
-    $N = 20000;
+    $N = 2000;
     $M = 200;
     
     $connection1 = $libredis->get_connection("$ip:6379");;
@@ -140,7 +141,7 @@ function test_simple() {
         $batch = $libredis->create_batch("GET $key\r\n", 1);
         $executor = $libredis->create_executor();
         $executor->add($connection, $batch);
-        $executor->execute();
+        $executor->execute(400);
         $batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
 		print_r($reply_value);
 	}

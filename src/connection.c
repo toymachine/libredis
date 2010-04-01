@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <string.h>
+#include <time.h>
 
 #include "redis.h"
 #include "event.h"
@@ -41,10 +42,19 @@ struct _Connection
 	struct event event_read;
 	struct event event_write;
 	Batch *current_batch;
+	Executor *current_executor;
 	ReplyParser *parser;
 };
 
+//forward decls.
+void Connection_abort(Connection *connection, const char *format,  ...);
+void Connection_execute(Connection *connection, Executor *executor, Batch *batch);
+void Connection_event_add(Connection *connection, struct event *event);
+void Connection_write_data(Connection *connection);
+void Connection_read_data(Connection *connection);
 void Connection_handle_event(int fd, short flags, void *data);
+
+void Executor_set_timeout(Executor *executor, struct timeval *tv);
 
 Connection *Connection_new(const char *in_addr)
 {
@@ -56,6 +66,7 @@ Connection *Connection_new(const char *in_addr)
 	}
 	connection->state = CS_CLOSED;
 	connection->current_batch = NULL;
+	connection->current_executor = NULL;
 	connection->parser = ReplyParser_new();
 	if(connection->parser == NULL) {
 		Connection_free(connection);
@@ -159,6 +170,7 @@ void Connection_abort(Connection *connection, const char *format,  ...)
 
 	Batch_abort(connection->current_batch, error2);
 	connection->current_batch = NULL;
+	connection->current_executor = NULL;
 
 	if(CS_CONNECTED == connection->state ||
 	   CS_CONNECTING == connection->state) {
@@ -178,11 +190,12 @@ void Connection_abort(Connection *connection, const char *format,  ...)
 	DEBUG(("Connection aborted\n"));
 }
 
-void Connection_execute(Connection *connection, Batch *batch)
+void Connection_execute(Connection *connection, Executor *executor, Batch *batch)
 {
 	DEBUG(("Connection exec\n"));
 
 	connection->current_batch = batch;
+	connection->current_executor = executor;
 
 	if(CS_ABORTED == connection->state) {
 		connection->state = CS_CLOSED;
@@ -201,19 +214,20 @@ void Connection_execute(Connection *connection, Batch *batch)
 
 	//kick off reading when socket becomes readable
 	if(CS_CONNECTED == connection->state) {
-		Connection_event_add(connection, &connection->event_read, 0, 400000);
+		Connection_event_add(connection, &connection->event_read);
 	}
 }
 
-void Connection_event_add(Connection *connection, struct event *event, long int tv_sec, long int tv_usec)
+void Connection_event_add(Connection *connection, struct event *event)
 {
 	if(CS_ABORTED == connection->state) {
 		return;
 	}
+	assert(connection->current_batch != NULL);
+	assert(connection->current_executor != NULL);
 
 	struct timeval tv;
-	tv.tv_sec = tv_sec;
-	tv.tv_usec = tv_usec;
+	Executor_set_timeout(connection->current_executor, &tv);
 	if(-1 == event_add(event, &tv)) {
 		Connection_abort(connection, "could not add event");
 		return;
@@ -225,6 +239,7 @@ void Connection_write_data(Connection *connection)
 {
 	DEBUG(("connection write_data fd: %d\n", connection->sockfd));
 	assert(connection->current_batch != NULL);
+	assert(connection->current_executor != NULL);
 	if(CS_ABORTED == connection->state) {
 		return;
 	}
@@ -241,7 +256,7 @@ void Connection_write_data(Connection *connection)
 				//normal async connect
 				connection->state = CS_CONNECTING;
 				DEBUG(("async connecting, adding write event\n"));
-				Connection_event_add(connection, &connection->event_write, 0, 400000);
+				Connection_event_add(connection, &connection->event_write);
 				DEBUG(("write event added, now returning\n"));
 				return;
 			}
@@ -271,7 +286,7 @@ void Connection_write_data(Connection *connection)
 		}
 		else {
 			connection->state = CS_CONNECTED;
-			Connection_event_add(connection, &connection->event_read, 0, 400000);
+			Connection_event_add(connection, &connection->event_read);
 		}
 	}
 
@@ -285,7 +300,7 @@ void Connection_write_data(Connection *connection)
 			DEBUG(("bfr send res: %d\n", res));
 			if(res == -1) {
 				if(errno == EAGAIN) {
-					Connection_event_add(connection, &connection->event_write, 0, 400000);
+					Connection_event_add(connection, &connection->event_write);
 					return;
 				}
 				else {
@@ -305,6 +320,7 @@ void Connection_read_data(Connection *connection)
 
 	DEBUG(("connection read data fd: %d\n", connection->sockfd));
 	assert(connection->current_batch != NULL);
+	assert(connection->current_executor != NULL);
 	assert(CS_CONNECTED == connection->state);
 
 	Buffer *buffer = Batch_read_buffer(connection->current_batch);
@@ -326,7 +342,7 @@ void Connection_read_data(Connection *connection)
 #endif
 			if(res == -1) {
 				if(errno == EAGAIN) {
-					Connection_event_add(connection, &connection->event_read, 0, 400000);
+					Connection_event_add(connection, &connection->event_read);
 					return;
 				}
 				else {
@@ -395,6 +411,7 @@ struct _Executor
 {
 	int numpairs;
 	struct _Pair pairs[MAX_PAIRS];
+	double end_tm_ms;
 };
 
 Executor *Executor_new()
@@ -432,18 +449,41 @@ int Executor_add(Executor *executor, Connection *connection, Batch *batch)
 	return 0;
 }
 
-int Executor_execute(Executor *executor)
+#define TIMESPEC_TO_DEBUG_MS(tm) (((double)tm.tv_sec) * 1000.0) + (((double)tm.tv_nsec) / 1000000.0)
+
+int Executor_execute(Executor *executor, int timeout_ms)
 {
 	DEBUG(("Executor execute start\n"));
+	struct timespec tm;
+	clock_gettime(CLOCK_MONOTONIC, &tm);
+	executor->end_tm_ms = TIMESPEC_TO_DEBUG_MS(tm) + ((float)timeout_ms);
+	DEBUG(("Executor end_tm_ms: %3.2f\n", executor->end_tm_ms));
+
 	for(int i = 0; i < executor->numpairs; i++) {
 		struct _Pair *pair = &executor->pairs[i];
-		Connection_execute(pair->connection, pair->batch);
+		Connection_execute(pair->connection, executor, pair->batch);
 	}
 	Module_dispatch();
 	DEBUG(("Executor execute done\n"));
 	return 0;
 }
 
+void Executor_set_timeout(Executor *executor, struct timeval *tv)
+{
+	//figure out how many ms left for this execution
+	struct timespec tm;
+	clock_gettime(CLOCK_MONOTONIC, &tm);
+	double cur_tm_ms = TIMESPEC_TO_DEBUG_MS(tm);
+	DEBUG(("Executor cur_tm: %3.2f\n", cur_tm_ms));
+	double left_ms = executor->end_tm_ms - cur_tm_ms;
+	DEBUG(("Time left: %3.2f\n", left_ms));
+
+	//set timeout based on that
+	tv->tv_sec = (time_t)left_ms / 1000.0;
+	tv->tv_usec = (left_ms - (tv->tv_sec * 1000.0)) * 1000.0;
+
+	DEBUG(("Timeout: %d sec, %d usec\n", (int)tv->tv_sec, (int)tv->tv_usec));
+}
 
 
 

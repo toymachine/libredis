@@ -48,7 +48,7 @@ char *Batch_error(Batch *batch);
 Executor *Executor_new();
 void Executor_free(Executor *executor);
 int Executor_add(Executor *executor, Connection *connection, Batch *batch);
-int Executor_execute(Executor *executor);
+int Executor_execute(Executor *executor, int timeout_ms);
 
 //ketama hashing
 Ketama *Ketama_new();
