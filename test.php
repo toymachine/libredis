@@ -203,11 +203,39 @@ function test_convenience()
 
 //test_ketama();
 //test_simple();
-test_mget();
+//test_mget();
 //test_destroy();
 //test_integer_reply();
 //test_connections();
 //test_convenience();
 //echo "done...!", PHP_EOL;
+
+/*
+$libredis = Libredis();
+$connection = $libredis->get_connection("127.0.0.1");
+//set a key
+$batch = $libredis->create_batch();
+$batch->set('hello', 'world');
+$batch->execute($connection); 
+//now fetch the key
+$batch = $libredis->create_batch();
+$batch->get('hello');
+$batch->execute($connection);
+while($batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
+    echo $reply_value, PHP_EOL;    
+}
+*/
+
+$libredis = Libredis();
+$connection1 = $libredis->get_connection("127.0.0.1:6973");
+$connection2 = $libredis->get_connection("127.0.0.1:6980");
+$batch1 = $libredis->create_batch();
+$batch1->set('hello', 'world');
+$batch2 = $libredis->create_batch();
+$batch2->set('hello2', 'world2');
+$executor = $libredis->create_executor();
+$executor->add($connection1, $batch1);
+$executor->add($connection2, $batch2);
+$executor->execute(); // execute all batches against all connections in parallel.
 
 ?>

@@ -1,0 +1,47 @@
+This is the README for Libredis (http://github.com/toymachine/libredis)
+
+Libredis is a C based general client library for Redis.
+
+A PHP extension is also included based on the lower-level C library.
+
+The goal of Libredis is to provide efficient low-level plumbing for accessing Redis servers. 
+
+It should be easy to build higher level abstractions on top of Libredis 
+(of which the included PHP extension is an example).
+
+Libredis provides a fast and efficient IO implementation for talking concurrently 
+with multiple Redis servers (using libevent based non-blocking IO). It uses a 'batch' abstraction in order
+to support pipeline-ing (e.g. send more than 1 command to Redis in a single operation).
+And finally a consistent hashing implementation (Ketama) is provided for partitioning keys across servers.
+
+-- Hello world (in PHP, using the included php extension) --
+
+$libredis = Libredis();
+$connection = $libredis->get_connection("127.0.0.1");
+//set a key
+$batch = $libredis->create_batch();
+$batch->set('hello', 'world');
+$batch->execute($connection); 
+//now fetch the key
+$batch = $libredis->create_batch();
+$batch->get('hello');
+$batch->execute($connection);
+while($batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
+    echo $reply_value, PHP_EOL;    
+}
+
+-- Talking to multiple servers in parallel --
+
+$libredis = Libredis();
+$connection1 = $libredis->get_connection("127.0.0.1:6973");
+$connection2 = $libredis->get_connection("127.0.0.1:6980");
+$batch1 = $libredis->create_batch();
+$batch1->set('hello', 'world');
+$batch2 = $libredis->create_batch();
+$batch2->set('hello2', 'world2');
+$executor = $libredis->create_executor();
+$executor->add($connection1, $batch1);
+$executor->add($connection2, $batch2);
+$executor->execute(); // execute all batches against all connections in parallel.
+
+ 

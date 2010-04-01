@@ -1,3 +1,11 @@
+/**
+* Copyright (C) 2010, Hyves (Startphone Ltd.)
+*
+* This module is part of Libredis (http://github.com/toymachine/libredis) and is released under
+* the New BSD License: http://www.opensource.org/licenses/bsd-license.php
+*
+*/
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -295,11 +303,28 @@ PHP_METHOD(Batch, next_reply)
 	RETURN_LONG(res);
 }
 
+PHP_METHOD(Batch, execute)
+{
+	zval *z_connection;
+	long timeout = DEFAULT_TIMEOUT_MS;
+
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "O|l", &z_connection, connection_ce, &timeout) == FAILURE) {
+		RETURN_NULL();
+	}
+
+	Connection *connection = T_fromObj(Connection, connection_ce, z_connection);
+	Executor *executor = Executor_new();
+	Executor_add(executor, connection, Batch_getThis());
+	Executor_execute(executor, timeout);
+	Executor_free(executor);
+}
+
 function_entry batch_methods[] = {
     PHP_ME(Batch,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
     PHP_ME(Batch,  write,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Batch,  set,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Batch,  get,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Batch,  execute,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Batch,  next_reply,           NULL, ZEND_ACC_PUBLIC)
     {NULL, NULL, NULL}
 };

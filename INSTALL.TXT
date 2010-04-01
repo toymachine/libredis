@@ -1,0 +1,14 @@
+You need the libevent and php development headers to build libredis.
+
+Then, in this director:
+
+make libredis
+
+if that goes ok
+
+sudo make php_ext
+
+this should build and install the php extension.
+
+enjoy.
+
