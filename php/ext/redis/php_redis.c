@@ -19,6 +19,7 @@ zend_class_entry *batch_ce;
 zend_class_entry *ketama_ce;
 zend_class_entry *connection_ce;
 zend_class_entry *redis_ce;
+zend_class_entry *executor_ce;
 
 Module g_module;
 HashTable g_connections;
@@ -86,6 +87,56 @@ function_entry ketama_methods[] = {
     {NULL, NULL, NULL}
 };
 
+/**************** EXECUTOR ***********************/
+
+
+#define Executor_getThis() T_getThis(Executor, executor_ce)
+#define Executor_setThis(p) T_setThis(p, executor_ce)
+
+PHP_METHOD(Executor, __destruct)
+{
+	Executor_free(Executor_getThis());
+	Executor_setThis(0);
+}
+
+PHP_METHOD(Executor, add)
+{
+	zval *z_connection;
+	zval *z_batch;
+
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "OO", &z_connection, connection_ce, &z_batch, batch_ce) == FAILURE) {
+		RETURN_NULL();
+	}
+
+	Connection *connection = T_fromObj(Connection, connection_ce, z_connection);
+	Batch *batch = T_fromObj(Batch, batch_ce, z_batch);
+
+	Executor_add(Executor_getThis(), connection, batch);
+}
+
+PHP_METHOD(Executor, execute)
+{
+	/*
+	char *key;
+	int key_len;
+
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "s", &key, &key_len) == FAILURE) {
+		RETURN_NULL();
+	}
+
+	RETURN_LONG(Ketama_get_server(Ketama_getThis(), key, key_len));
+	*/
+	Executor_execute(Executor_getThis());
+}
+
+function_entry executor_methods[] = {
+    PHP_ME(Executor,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
+    PHP_ME(Executor,  add,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Executor,  execute,           NULL, ZEND_ACC_PUBLIC)
+    {NULL, NULL, NULL}
+};
+
+
 /**************** CONNECTIONS ***********************/
 
 #define Connection_getThis() T_getThis(Connection, connection_ce)
@@ -99,22 +150,19 @@ PHP_METHOD(Connection, __destruct)
 
 PHP_METHOD(Connection, execute)
 {
-	zval *obj;
+	zval *z_batch;
 
-	zend_bool dispatch = 0;
-
-	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "O|b", &obj, batch_ce, &dispatch) == FAILURE) {
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "O", &z_batch, batch_ce) == FAILURE) {
 		RETURN_NULL();
 	}
 
-	Batch *batch = T_fromObj(Batch, batch_ce, obj);
-
-	Connection_execute(Connection_getThis(), batch);
-
-	if(dispatch) {
-		Module_dispatch();
-	}
+	Batch *batch = T_fromObj(Batch, batch_ce, z_batch);
+	Executor *executor = Executor_new();
+	Executor_add(executor, Connection_getThis(), batch);
+	Executor_execute(executor);
+	Executor_free(executor);
 }
+
 
 function_entry connection_methods[] = {
     PHP_ME(Connection,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
@@ -270,6 +318,12 @@ PHP_METHOD(Redis, create_ketama)
 	zend_update_property_long(ketama_ce, return_value, "handle", 6, (long)Ketama_new());
 }
 
+PHP_METHOD(Redis, create_executor)
+{
+	object_init_ex(return_value, executor_ce);
+	zend_update_property_long(executor_ce, return_value, "handle", 6, (long)Executor_new());
+}
+
 PHP_METHOD(Redis, get_connection)
 {
 	char *addr;
@@ -327,16 +381,11 @@ PHP_METHOD(Redis, create_batch)
 
 }
 
-PHP_METHOD(Redis, dispatch)
-{
-	Module_dispatch();
-}
-
 function_entry redis_methods[] = {
     PHP_ME(Redis,  create_ketama,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Redis,  create_executor,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Redis,  create_batch,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Redis,  get_connection,           NULL, ZEND_ACC_PUBLIC)
-    PHP_ME(Redis,  dispatch,           NULL, ZEND_ACC_PUBLIC)
     {NULL, NULL, NULL}
 };
 
@@ -349,6 +398,10 @@ PHP_MINIT_FUNCTION(redis)
     INIT_CLASS_ENTRY(ce, "_Libredis_Ketama", ketama_methods);
     ketama_ce = zend_register_internal_class(&ce TSRMLS_CC);
     zend_declare_property_long(ketama_ce, "handle", 6, 0, ZEND_ACC_PRIVATE);
+
+    INIT_CLASS_ENTRY(ce, "_Libredis_Executor", executor_methods);
+    executor_ce = zend_register_internal_class(&ce TSRMLS_CC);
+    zend_declare_property_long(executor_ce, "handle", 6, 0, ZEND_ACC_PRIVATE);
 
     INIT_CLASS_ENTRY(ce, "_Libredis_Connection", connection_methods);
     connection_ce = zend_register_internal_class(&ce TSRMLS_CC);

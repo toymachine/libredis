@@ -16,12 +16,12 @@ typedef struct _Module
 } Module;
 
 void Module_init(Module *module);
-void Module_dispatch();
 void Module_free();
 
 typedef struct _Batch Batch;
 typedef struct _Connection Connection;
 typedef struct _Ketama Ketama;
+typedef struct _Executor Executor;
 
 typedef enum _ReplyType
 {
@@ -37,7 +37,6 @@ typedef enum _ReplyType
 
 Connection *Connection_new(const char *addr);
 void Connection_free(Connection *connection);
-void Connection_execute(Connection *connection, Batch *batch);
 
 Batch *Batch_new();
 void Batch_free(Batch *batch);
@@ -45,6 +44,11 @@ void Batch_write(Batch *batch, const char *str, size_t str_len, int num_commands
 //reading out replies
 int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *len);
 char *Batch_error(Batch *batch);
+
+Executor *Executor_new();
+void Executor_free(Executor *executor);
+int Executor_add(Executor *executor, Connection *connection, Batch *batch);
+int Executor_execute(Executor *executor);
 
 //ketama hashing
 Ketama *Ketama_new();

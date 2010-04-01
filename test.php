@@ -65,15 +65,16 @@ function mget($keys, $ketama) {
         $batch->write(" $key");
         $batch_keys[$server_ordinal][] = $key;
     }
-    //finalize batches, and start executing
+    $executor = $libredis->create_executor();
+    //finalize batches, add them to executor
     foreach($batches as $server_ordinal=>$batch) {
         $batch->write("\r\n", 1);
         $server_addr = $ketama->get_server_addr($server_ordinal);
 		$connection = $libredis->get_connection($server_addr);	
-        $connection->execute($batch);
+        $executor->add($connection, $batch);
     }
     //handle events until all complete
-	$libredis->dispatch();
+	$executor->execute();
     //build up results
     $results = array();
     foreach($batches as $server_ordinal=>$batch) {
@@ -111,10 +112,8 @@ function test_mget()
     for($i = 0; $i < $M; $i++) {
         $key = "piet$i";
         $value = "blaat$i";
-        $batch = $libredis->create_batch()->set($key, $value);
-        $connection1->execute($batch, true);
-        $batch = $libredis->create_batch()->set($key, $value);
-        $connection2->execute($batch, true);
+        $connection1->execute($libredis->create_batch()->set($key, $value));
+        $connection2->execute($libredis->create_batch()->set($key, $value));
         $keys[] = $key;
     }
     
@@ -129,23 +128,21 @@ function test_mget()
     echo "msec per mget ", ($end - $start) / $N * 1000.0, PHP_EOL;
 }
 
-function _test_simple($connection, $key)
-{
-    global $libredis;
-	$batch = $libredis->create_batch("GET $key\r\n", 1);
-	$connection->execute($batch, true);
-	$batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
-	return $reply_value;
-}
-
 function test_simple() {
 	
     global $libredis;
     global $ip;
-	$connection = $libredis->get_connection("$ip:6379");
+	
+    $connection = $libredis->get_connection("$ip:6379");
+	$key = 'library';
 	
 	for($i = 0; $i < 1; $i++) {
-		print_r(_test_simple($connection, "library"));
+        $batch = $libredis->create_batch("GET $key\r\n", 1);
+        $executor = $libredis->create_executor();
+        $executor->add($connection, $batch);
+        $executor->execute();
+        $batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
+		print_r($reply_value);
 	}
 }
 
@@ -159,10 +156,10 @@ function test_destroy() {
 function test_integer_reply()
 {
     global $libredis;
-	$batch = $libredis->create_batch("INCR incr_test\r\n", 1);
+    global $ip;
 	$connection = $libredis->get_connection("$ip:6379");
+	$batch = $libredis->create_batch("INCR incr_test\r\n", 1);
 	$connection->execute($batch);
-	$libredis->dispatch();
 	while($level = $batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
 		echo "start", PHP_EOL;
 		echo "\ttype ", $reply_type, PHP_EOL;
@@ -184,28 +181,32 @@ function test_connections()
 
 function test_convenience()
 {
+    global $libredis;
+    global $ip;
     $batch = $libredis->create_batch();
     $batch->set("blaat", "aap");
     $batch->set("joop", "blaat");
     $connection = $libredis->get_connection("$ip:6379");
-    $connection->execute($batch, true);
+    $connection->execute($batch);
     while($batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
         echo $reply_value, PHP_EOL;    
     }
     $batch = $libredis->create_batch();
     $batch->get("blaat");
     $batch->get("joop");
-    $connection->execute($batch, true);
+    $connection->execute($batch);
     while($batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
         echo $reply_value, PHP_EOL;    
     }
 }
+
 //test_ketama();
 //test_simple();
 test_mget();
 //test_destroy();
 //test_integer_reply();
 //test_connections();
+//test_convenience();
 //echo "done...!", PHP_EOL;
 
 ?>

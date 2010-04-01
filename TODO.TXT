@@ -3,5 +3,7 @@
 - timeouts
 - signal interrupt errors?
 
+- close connection on connection free
+- list alloc executor
 - reconnect when server disconnected (auto server disconnect)?
 - make proper php module globals for g_connections and g_module

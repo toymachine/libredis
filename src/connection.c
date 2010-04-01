@@ -11,6 +11,7 @@
 #include <assert.h>
 #include <string.h>
 
+#include "redis.h"
 #include "event.h"
 #include "common.h"
 #include "buffer.h"
@@ -18,6 +19,7 @@
 #include "reply.h"
 #include "parser.h"
 #include "batch.h"
+
 
 #define ADDR_SIZE 22 //max size of ip:port addr string
 
@@ -379,6 +381,69 @@ void Connection_handle_event(int fd, short flags, void *data)
 	}
 
 }
+
+
+#define MAX_PAIRS 1024
+
+struct _Pair
+{
+	Batch *batch;
+	Connection *connection;
+};
+
+struct _Executor
+{
+	int numpairs;
+	struct _Pair pairs[MAX_PAIRS];
+};
+
+Executor *Executor_new()
+{
+	DEBUG(("alloc Executor\n"));
+	Executor *executor = Alloc_alloc_T(Executor);
+	if(executor == NULL) {
+		SETERROR(("Out of memory while allocating Executor"));
+		return NULL;
+	}
+	executor->numpairs = 0;
+	return executor;
+}
+
+void Executor_free(Executor *executor)
+{
+	if(executor == NULL) {
+		return;
+	}
+	DEBUG(("dealloc Executor\n"));
+	Alloc_free_T(executor, Executor);
+}
+
+int Executor_add(Executor *executor, Connection *connection, Batch *batch)
+{
+	if(executor->numpairs >= MAX_PAIRS) {
+		SETERROR(("executor is full"));
+		return -1;
+	}
+	struct _Pair *pair = &executor->pairs[executor->numpairs];
+	pair->batch = batch;
+	pair->connection = connection;
+	executor->numpairs += 1;
+	DEBUG(("Executor add, total: %d\n", executor->numpairs));
+	return 0;
+}
+
+int Executor_execute(Executor *executor)
+{
+	DEBUG(("Executor execute start\n"));
+	for(int i = 0; i < executor->numpairs; i++) {
+		struct _Pair *pair = &executor->pairs[i];
+		Connection_execute(pair->connection, pair->batch);
+	}
+	Module_dispatch();
+	DEBUG(("Executor execute done\n"));
+	return 0;
+}
+
 
 
 
