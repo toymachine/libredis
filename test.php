@@ -203,7 +203,7 @@ function test_convenience()
 
 //test_ketama();
 //test_simple();
-//test_mget();
+test_mget();
 //test_destroy();
 //test_integer_reply();
 //test_connections();
@@ -226,6 +226,7 @@ while($batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
 }
 */
 
+/*
 $libredis = Libredis();
 $connection1 = $libredis->get_connection("127.0.0.1:6973");
 $connection2 = $libredis->get_connection("127.0.0.1:6980");
@@ -237,5 +238,6 @@ $executor = $libredis->create_executor();
 $executor->add($connection1, $batch1);
 $executor->add($connection2, $batch2);
 $executor->execute(); // execute all batches against all connections in parallel.
+*/
 
 ?>

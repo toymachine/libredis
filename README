@@ -1,8 +1,8 @@
 This is the README for Libredis (http://github.com/toymachine/libredis)
 
-Libredis is a C based general client library for Redis.
+Libredis is general client library for Redis written in C.
 
-A PHP extension is also included based on the lower-level C library.
+A PHP extension is also included based on this lower-level C library.
 
 The goal of Libredis is to provide efficient low-level plumbing for accessing Redis servers. 
 
@@ -10,9 +10,18 @@ It should be easy to build higher level abstractions on top of Libredis
 (of which the included PHP extension is an example).
 
 Libredis provides a fast and efficient IO implementation for talking concurrently 
-with multiple Redis servers (using libevent based non-blocking IO). It uses a 'batch' abstraction in order
-to support pipeline-ing (e.g. send more than 1 command to Redis in a single operation).
-And finally a consistent hashing implementation (Ketama) is provided for partitioning keys across servers.
+with multiple Redis servers (using libevent based non-blocking IO). 
+It uses a 'batch' abstraction in order to support pipeline-ing 
+(e.g. send more than 1 command to Redis in a single operation), and
+finally a consistent hashing implementation (Ketama) is provided for partitioning keys across servers.
+
+The low-level library knows about and validates any possible Redis result, but does not restrict you
+in what commands you send trough it, e.g. you can/must format commands yourself. This allows the library
+to be used with any new and upcoming Redis versions without updates, as long as the
+format of the results does not change.
+
+As a convenience, The PHP extension does at least support formatting the get and set commands.
+
 
 -- Hello world (in PHP, using the included php extension) --
 
@@ -41,9 +50,23 @@ $batch2 = $libredis->create_batch();
 $batch2->set('hello2', 'world2');
 $executor = $libredis->create_executor();
 $executor->add($connection1, $batch1); //associate connection1 with batch1
-$executor->add($connection2, $batch2); //associate connection1 with batch2
+$executor->add($connection2, $batch2); //associate connection2 with batch2
 //execute all batches against their corresponding connections in parallel, with a
 //500 ms timeout on the whole operation.
 $executor->execute(500);  
 
- 
+So basically, 
+
+1. Commands are written into Batches; Batch::write(...), Batch::set(key, value), Batch::get(key) 
+2. Batches are associated with Connections trough an Executor; Executor::add(connection, batch)
+3. The total operation is performed within a configurable timeout by calling Executor::execute(timeout)
+4. When execution returns, batches will contain replies that can be read out; Batch::next_reply(...)
+
+For simple cases (single server, single batch), batches also can be executed directly; Batch::execute(connection, timeout)
+
+An implementation of a multi-server multi-get can be found in test.php (test_mget)
+
+
+
+
+

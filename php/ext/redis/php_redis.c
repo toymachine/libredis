@@ -363,7 +363,7 @@ PHP_METHOD(Redis, get_connection)
 		//syslog(LOG_DEBUG, "connection not found: %s", addr);
 		connection = Connection_new(addr);
 		if(connection == NULL) {
-			 zend_error(E_ERROR, g_module.error);
+			 zend_error(E_ERROR, "%s", g_module.error);
 		}
 		//syslog(LOG_DEBUG, "connection created addr: %p", connection);
 		zend_hash_update(&g_connections, addr, addr_len, &connection, sizeof(connection), &pDest);

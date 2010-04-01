@@ -457,14 +457,14 @@ int Executor_add(Executor *executor, Connection *connection, Batch *batch)
 	return 0;
 }
 
-#define TIMESPEC_TO_DEBUG_MS(tm) (((double)tm.tv_sec) * 1000.0) + (((double)tm.tv_nsec) / 1000000.0)
+#define TIMESPEC_TO_MS(tm) (((double)tm.tv_sec) * 1000.0) + (((double)tm.tv_nsec) / 1000000.0)
 
 int Executor_execute(Executor *executor, int timeout_ms)
 {
 	DEBUG(("Executor execute start\n"));
 	struct timespec tm;
 	clock_gettime(CLOCK_MONOTONIC, &tm);
-	executor->end_tm_ms = TIMESPEC_TO_DEBUG_MS(tm) + ((float)timeout_ms);
+	executor->end_tm_ms = TIMESPEC_TO_MS(tm) + ((float)timeout_ms);
 	DEBUG(("Executor end_tm_ms: %3.2f\n", executor->end_tm_ms));
 
 	for(int i = 0; i < executor->numpairs; i++) {
@@ -481,7 +481,7 @@ void Executor_set_timeout(Executor *executor, struct timeval *tv)
 	//figure out how many ms left for this execution
 	struct timespec tm;
 	clock_gettime(CLOCK_MONOTONIC, &tm);
-	double cur_tm_ms = TIMESPEC_TO_DEBUG_MS(tm);
+	double cur_tm_ms = TIMESPEC_TO_MS(tm);
 	DEBUG(("Executor cur_tm: %3.2f\n", cur_tm_ms));
 	double left_ms = executor->end_tm_ms - cur_tm_ms;
 	DEBUG(("Time left: %3.2f\n", left_ms));
