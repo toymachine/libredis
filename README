@@ -33,8 +33,8 @@ while($batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
 -- Talking to multiple servers in parallel --
 
 $libredis = Libredis();
-$connection1 = $libredis->get_connection("127.0.0.1:6973");
-$connection2 = $libredis->get_connection("127.0.0.1:6980");
+$connection1 = $libredis->get_connection("127.0.0.1:6379");
+$connection2 = $libredis->get_connection("127.0.0.1:6380");
 $batch1 = $libredis->create_batch();
 $batch1->set('hello', 'world');
 $batch2 = $libredis->create_batch();
