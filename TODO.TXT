@@ -1,14 +1,7 @@
 - php abort
 
-- socket creation errors
-- connection timeout
-- connection (re) connect and errors
-- connection reply parser error
-- connection read and write timeouts
-- read and write EOF
-- other read and write errors
+- timeouts
 - signal interrupt errors?
 
-
-- reconnect when server disconnected (auto server disconnect)
+- reconnect when server disconnected (auto server disconnect)?
 - make proper php module globals for g_connections and g_module

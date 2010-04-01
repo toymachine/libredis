@@ -111,10 +111,9 @@ function test_mget()
     for($i = 0; $i < $M; $i++) {
         $key = "piet$i";
         $value = "blaat$i";
-        $len = strlen($value);
-        $batch = $libredis->create_batch("SET $key $len\r\n$value\r\n", 1);
+        $batch = $libredis->create_batch()->set($key, $value);
         $connection1->execute($batch, true);
-        $batch = $libredis->create_batch("SET $key $len\r\n$value\r\n", 1);
+        $batch = $libredis->create_batch()->set($key, $value);
         $connection2->execute($batch, true);
         $keys[] = $key;
     }
@@ -183,6 +182,24 @@ function test_connections()
     }
 }
 
+function test_convenience()
+{
+    $batch = $libredis->create_batch();
+    $batch->set("blaat", "aap");
+    $batch->set("joop", "blaat");
+    $connection = $libredis->get_connection("$ip:6379");
+    $connection->execute($batch, true);
+    while($batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
+        echo $reply_value, PHP_EOL;    
+    }
+    $batch = $libredis->create_batch();
+    $batch->get("blaat");
+    $batch->get("joop");
+    $connection->execute($batch, true);
+    while($batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
+        echo $reply_value, PHP_EOL;    
+    }
+}
 //test_ketama();
 //test_simple();
 test_mget();
@@ -190,13 +207,5 @@ test_mget();
 //test_integer_reply();
 //test_connections();
 //echo "done...!", PHP_EOL;
-
-/*
-$cnn = $libredis->get_connection('192.168.13.93');
-$batch = $libredis->create_batch("GET library\r\n", 1);
-$cnn->execute($batch, true);
-$batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
-echo "$reply_type $reply_value $reply_length";
-*/
 
 ?>

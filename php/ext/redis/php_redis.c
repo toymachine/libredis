@@ -148,6 +148,46 @@ PHP_METHOD(Batch, write)
 	Batch_write(Batch_getThis(), str, str_len, num_commands);
 }
 
+PHP_METHOD(Batch, set)
+{
+	char *key;
+	int key_len;
+	char *value;
+	int value_len;
+
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "ss", &key, &key_len, &value, &value_len) == FAILURE) {
+		RETURN_NULL();
+	}
+
+	Batch *batch = Batch_getThis();
+	Batch_write(batch, "SET ", 4, 0);
+	Batch_write(batch, key, key_len, 0);
+	char buff[16];
+	int bufl = snprintf(buff, 16, " %d\r\n", value_len);
+	Batch_write(batch, buff, bufl, 0);
+	Batch_write(batch, value, value_len, 0);
+	Batch_write(batch, "\r\n", 2, 1);
+
+	RETURN_ZVAL(getThis(), 1, 0);
+}
+
+PHP_METHOD(Batch, get)
+{
+	char *key;
+	int key_len;
+
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "s", &key, &key_len) == FAILURE) {
+		RETURN_NULL();
+	}
+
+	Batch *batch = Batch_getThis();
+	Batch_write(batch, "GET ", 4, 0);
+	Batch_write(batch, key, key_len, 0);
+	Batch_write(batch, "\r\n", 2, 1);
+
+	RETURN_ZVAL(getThis(), 1, 0);
+}
+
 PHP_METHOD(Batch, next_reply)
 {
 	zval *reply_type;
@@ -211,6 +251,8 @@ PHP_METHOD(Batch, next_reply)
 function_entry batch_methods[] = {
     PHP_ME(Batch,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
     PHP_ME(Batch,  write,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Batch,  set,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Batch,  get,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Batch,  next_reply,           NULL, ZEND_ACC_PUBLIC)
     {NULL, NULL, NULL}
 };
