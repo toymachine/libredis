@@ -31,7 +31,7 @@ function test_ketama() {
 	echo "ord: ", $ordinal, PHP_EOL;
 	echo "addr: ", $ketama->get_server_addr($ordinal), PHP_EOL;
 	
-	//speed of creating continuum:
+	//test speed of creating continuum:
     $start = microtime(true);
 	$N = 1000;
 	for($j = 0; $j < $N; $j++) {
@@ -65,8 +65,8 @@ function mget($keys, $ketama) {
         $batch->write(" $key");
         $batch_keys[$server_ordinal][] = $key;
     }
-    $executor = $libredis->create_executor();
     //finalize batches, add them to executor
+    $executor = $libredis->create_executor();
     foreach($batches as $server_ordinal=>$batch) {
         $batch->write("\r\n", 1);
         $server_addr = $ketama->get_server_addr($server_ordinal);
