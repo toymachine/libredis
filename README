@@ -36,12 +36,14 @@ $libredis = Libredis();
 $connection1 = $libredis->get_connection("127.0.0.1:6379");
 $connection2 = $libredis->get_connection("127.0.0.1:6380");
 $batch1 = $libredis->create_batch();
-$batch1->set('hello', 'world');
+$batch1->set('hello', 'world'); //add a 'set' command to batch1
 $batch2 = $libredis->create_batch();
 $batch2->set('hello2', 'world2');
 $executor = $libredis->create_executor();
 $executor->add($connection1, $batch1); //associate connection1 with batch1
 $executor->add($connection2, $batch2); //associate connection1 with batch2
-$executor->execute(); // execute all batches against their corresponding connections in parallel.
+//execute all batches against their corresponding connections in parallel, with a
+//500 ms timeout on the whole operation.
+$executor->execute(500);  
 
  
