@@ -25,14 +25,14 @@ typedef struct _Ketama Ketama;
 
 typedef enum _ReplyType
 {
+	RT_ERROR = -1,
 	RT_NONE = 0,
     RT_OK = 1,
-	RT_ERROR = 2,
-    RT_BULK_NIL = 3,
-    RT_BULK = 4,
-    RT_MULTIBULK_NIL = 5,
-    RT_MULTIBULK = 6,
-    RT_INTEGER = 7
+    RT_BULK_NIL = 2,
+    RT_BULK = 3,
+    RT_MULTIBULK_NIL = 4,
+    RT_MULTIBULK = 5,
+    RT_INTEGER = 6
 } ReplyType;
 
 Connection *Connection_new(const char *addr);

@@ -1,5 +1,14 @@
 <?php
 
+define("RT_ERROR", -1);
+define("RT_NONE", 0);
+define("RT_OK", 1);
+define("RT_BULK_NIL", 2);
+define("RT_BULK", 3);
+define("RT_MULTIBULK_NIL", 4);
+define("RT_MULTIBULK", 5);
+define("RT_INTEGER", 6);
+
 $ip = "127.0.0.1";
 //$ip = "192.168.13.92";
 
@@ -70,12 +79,14 @@ function mget($keys, $ketama) {
     foreach($batches as $server_ordinal=>$batch) {
     	//read multibulk reply
 	    $batch->next_reply(&$mb_reply_type, &$mb_reply_value, &$mb_reply_length);
-	    foreach($batch_keys[$server_ordinal] as $key) {
-    	    $batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
-    	    if($reply_type == 4) {
-	    	    $results[$key] = $reply_value;
-    	    }
-		}
+	    if(RT_ERROR != $mb_reply_type) {
+    	    foreach($batch_keys[$server_ordinal] as $key) {
+        	    $batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
+        	    if(RT_BULK == $reply_type) {
+        	       $results[$key] = $reply_value;
+        	    }
+    		}
+	    }
 	}
 	
 	return $results;
@@ -91,7 +102,7 @@ function test_mget()
     $ketama->create_continuum();
 
     //$N = 200000;
-    $N = 2000;
+    $N = 20000;
     $M = 200;
     
     $connection1 = $libredis->get_connection("$ip:6379");;
@@ -112,6 +123,7 @@ function test_mget()
     for($i = 0; $i < $N; $i++) {
         mget($keys, $ketama);
         //print_r(mget($keys, $ketama));
+        //echo $i, PHP_EOL;
     }
     $end = microtime(true);
     echo "per/sec ", $N * $M / ($end - $start), PHP_EOL;

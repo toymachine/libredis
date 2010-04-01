@@ -332,6 +332,10 @@ void Connection_read_data(Connection *connection)
 					return;
 				}
 			}
+			else if(res == 0) {
+				Connection_abort(connection, "read eof");
+				return;
+			}
 			break;
 		}
 		case RPR_REPLY: {
