@@ -150,11 +150,15 @@ function test_simple() {
 function test_leak() {
     global $libredis;
     $batches = array();
+    $ketamas = array();
+    $executors = array();
     for($i = 0; $i < 100; $i++) {
         $batches[] = $libredis->create_batch("GET $key\r\n", 1);
+        $ketama[] = $libredis->create_ketama();
+        $executors[] = $libredis->create_executor();
     }
-    //$x = new Blaat();
-    throw new Exception("piet");
+    $x = new Blaat();
+    //throw new Exception("piet");
 }
 
 function test_destroy() {

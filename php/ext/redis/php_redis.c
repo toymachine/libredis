@@ -33,7 +33,10 @@ zend_class_entry *executor_ce;
 
 //TODO proper php module globals?:
 Module g_module;
-HashTable g_connections;
+HashTable g_connections; //persistent connections
+HashTable g_batch; //for keeping track of batch instances
+HashTable g_ketama; //for keeping track of ketama instances
+HashTable g_executor; //for keeping track of executor instances
 
 /**************** KETAMA ***********************/
 
@@ -43,7 +46,9 @@ HashTable g_connections;
 
 PHP_METHOD(Ketama, __destruct)
 {
-	Ketama_free(Ketama_getThis());
+	Ketama *ketama = Ketama_getThis();
+	zend_hash_del(&g_ketama, (char *)&ketama, sizeof(ketama));
+	Ketama_free(ketama);
 	Ketama_setThis(0);
 }
 
@@ -106,7 +111,9 @@ function_entry ketama_methods[] = {
 
 PHP_METHOD(Executor, __destruct)
 {
-	Executor_free(Executor_getThis());
+	Executor *executor = Executor_getThis();
+	zend_hash_del(&g_executor, (char *)&executor, sizeof(executor));
+	Executor_free(executor);
 	Executor_setThis(0);
 }
 
@@ -187,7 +194,9 @@ function_entry connection_methods[] = {
 
 PHP_METHOD(Batch, __destruct)
 {
-	Batch_free(Batch_getThis());
+	Batch *batch = Batch_getThis();
+	zend_hash_del(&g_batch, (char *)&batch, sizeof(batch));
+	Batch_free(batch);
 	Batch_setThis(0);
 }
 
@@ -340,13 +349,19 @@ PHP_FUNCTION(Libredis)
 PHP_METHOD(Redis, create_ketama)
 {
 	object_init_ex(return_value, ketama_ce);
-	zend_update_property_long(ketama_ce, return_value, "handle", 6, (long)Ketama_new());
+	Ketama *ketama = Ketama_new();
+	zend_update_property_long(ketama_ce, return_value, "handle", 6, (long)ketama);
+	void *pDest;
+	zend_hash_update(&g_ketama, (char *)&ketama, sizeof(ketama), &ketama, sizeof(ketama), &pDest);
 }
 
 PHP_METHOD(Redis, create_executor)
 {
 	object_init_ex(return_value, executor_ce);
-	zend_update_property_long(executor_ce, return_value, "handle", 6, (long)Executor_new());
+	Executor *executor = Executor_new();
+	zend_update_property_long(executor_ce, return_value, "handle", 6, (long)executor);
+	void *pDest;
+	zend_hash_update(&g_executor, (char *)&executor, sizeof(executor), &executor, sizeof(executor), &pDest);
 }
 
 PHP_METHOD(Redis, get_connection)
@@ -378,19 +393,13 @@ PHP_METHOD(Redis, get_connection)
 	zend_update_property_long(connection_ce, return_value, "handle", 6, (long)connection);
 }
 
-int _shutdown_free_connection(void *pDest TSRMLS_DC)
-{
-	Connection *connection = *((Connection **)pDest);
-	Connection_free(connection);
-	//syslog(LOG_DEBUG, "connection freed: %p", connection);
-	return ZEND_HASH_APPLY_KEEP;
-}
-
 PHP_METHOD(Redis, create_batch)
 {
 	Batch *batch = Batch_new();
 	object_init_ex(return_value, batch_ce);
 	zend_update_property_long(batch_ce, return_value, "handle", 6, (long)batch);
+	void *pDest;
+	zend_hash_update(&g_batch, (char *)&batch, sizeof(batch), &batch, sizeof(batch), &pDest);
 
 	char *str = NULL;
 	int str_len = 0;
@@ -441,6 +450,9 @@ PHP_MINIT_FUNCTION(redis)
 
     //init hashtable for persistent connections
     zend_hash_init(&g_connections, 128, NULL, NULL, 1);
+    zend_hash_init(&g_batch, 128, NULL, NULL, 1);
+    zend_hash_init(&g_ketama, 32, NULL, NULL, 1);
+    zend_hash_init(&g_executor, 16, NULL, NULL, 1);
 
     g_module.size = sizeof(Module);
     g_module.alloc_malloc = __zend_malloc;
@@ -454,11 +466,29 @@ PHP_MINIT_FUNCTION(redis)
     return SUCCESS;
 }
 
+#define SHUTDOWN_FREE_T(T) \
+int shutdown_hash_free_ ## T(void *pDest TSRMLS_DC) \
+{ \
+	T *obj = *((T **)pDest); \
+	T ## _free(obj); \
+	return ZEND_HASH_APPLY_REMOVE; \
+} \
+
+
+SHUTDOWN_FREE_T(Batch)
+SHUTDOWN_FREE_T(Ketama)
+SHUTDOWN_FREE_T(Executor)
+SHUTDOWN_FREE_T(Connection)
+
+
 PHP_MSHUTDOWN_FUNCTION(redis)
 {
 	//free the persistent connections
-	zend_hash_apply(&g_connections, _shutdown_free_connection);
+	zend_hash_apply(&g_connections, shutdown_hash_free_Connection);
 	zend_hash_destroy(&g_connections);
+	zend_hash_destroy(&g_batch);
+	zend_hash_destroy(&g_ketama);
+	zend_hash_destroy(&g_executor);
 	//todo check if the above really release all resource, what about the items in the hashtable?, are they released
 	//hash destroy?
 
@@ -480,9 +510,12 @@ PHP_RINIT_FUNCTION(redis)
 
 PHP_RSHUTDOWN_FUNCTION(redis)
 {
-	openlog("libredis", 0, LOG_LOCAL2);
-	syslog(LOG_DEBUG, "libredis request shutdown complete, final alloc: %d\n", g_module.allocated);
+	zend_hash_apply(&g_batch, shutdown_hash_free_Batch); //frees any batches still left, e.g. not freed by normal dispose
+	zend_hash_apply(&g_ketama, shutdown_hash_free_Ketama); //frees any ketama still left, e.g. not freed by normal dispose
+	zend_hash_apply(&g_executor, shutdown_hash_free_Executor); //frees any executor still left, e.g. not freed by normal dispose
 
+	openlog("libredis", 0, LOG_LOCAL2);
+	syslog(LOG_DEBUG, "libredis request shutdown complete, final alloc: %d, g_batchsz: %d\n", g_module.allocated, g_batch.nNumOfElements);
 
 	return SUCCESS;
 }

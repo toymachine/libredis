@@ -6,4 +6,4 @@
 
 php:    
     - batch->simple_reply()
-    - check that dispose is called always, e.g. also in case of fatal errors etc
+    - use static redis lib for php extension
