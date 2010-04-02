@@ -329,13 +329,19 @@ PHP_METHOD(Batch, execute)
 	Executor_free(executor);
 }
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_batch_next_rely, 0, 0, 3)
+	ZEND_ARG_INFO(1, reply_type)
+	ZEND_ARG_INFO(1, reply_value)
+	ZEND_ARG_INFO(1, reply_length)
+ZEND_END_ARG_INFO()
+
 function_entry batch_methods[] = {
     PHP_ME(Batch,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
     PHP_ME(Batch,  write,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Batch,  set,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Batch,  get,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Batch,  execute,           NULL, ZEND_ACC_PUBLIC)
-    PHP_ME(Batch,  next_reply,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Batch,  next_reply,           arginfo_batch_next_rely, ZEND_ACC_PUBLIC)
     {NULL, NULL, NULL}
 };
 

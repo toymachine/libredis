@@ -79,11 +79,11 @@ function mget($keys, $ketama) {
     $results = array();
     foreach($batches as $server_ordinal=>$batch) {
     	//read the single multibulk reply
-	    $batch->next_reply(&$mb_reply_type, &$mb_reply_value, &$mb_reply_length);
+	    $batch->next_reply($mb_reply_type, $mb_reply_value, $mb_reply_length);
 	    if(RT_ERROR != $mb_reply_type) {
 	        //read the individual bulk replies in the multibulk reply
     	    foreach($batch_keys[$server_ordinal] as $key) {
-        	    $batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
+        	    $batch->next_reply($reply_type, $reply_value, $reply_length);
         	    if(RT_BULK == $reply_type) {
         	       $results[$key] = $reply_value;
         	    }
@@ -104,7 +104,7 @@ function test_mget()
     $ketama->create_continuum();
 
     //$N = 200000;
-    $N = 2000;
+    $N = 20000;
     $M = 200;
     
     $connection1 = $libredis->get_connection("$ip:6379");;
@@ -142,8 +142,9 @@ function test_simple() {
         $executor = $libredis->create_executor();
         $executor->add($connection, $batch);
         $executor->execute(400);
-        $batch->next_reply(&$reply_type, &$reply_value, &$reply_length);
+        $batch->next_reply($reply_type, $reply_value, $reply_length);
 		print_r($reply_value);
+        echo gettype($reply_value), PHP_EOL;
 	}
 }
 
@@ -175,7 +176,7 @@ function test_integer_reply()
 	$connection = $libredis->get_connection("$ip:6379");
 	$batch = $libredis->create_batch("INCR incr_test\r\n", 1);
 	$connection->execute($batch);
-	while($level = $batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
+	while($level = $batch->next_reply($reply_type, $reply_value, $reply_length)) {
 		echo "start", PHP_EOL;
 		echo "\ttype ", $reply_type, PHP_EOL;
 		echo "\tval ", $reply_value, " (", gettype($reply_value), ")", PHP_EOL;
@@ -203,14 +204,14 @@ function test_convenience()
     $batch->set("joop", "blaat");
     $connection = $libredis->get_connection("$ip:6379");
     $connection->execute($batch);
-    while($batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
+    while($batch->next_reply($reply_type, $reply_value, $reply_length)) {
         echo $reply_value, PHP_EOL;    
     }
     $batch = $libredis->create_batch();
     $batch->get("blaat");
     $batch->get("joop");
     $connection->execute($batch);
-    while($batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
+    while($batch->next_reply($reply_type, $reply_value, $reply_length)) {
         echo $reply_value, PHP_EOL;    
     }
 }
@@ -224,35 +225,5 @@ test_leak();
 //test_connections();
 //test_convenience();
 //echo "done...!", PHP_EOL;
-
-/*
-$libredis = Libredis();
-$connection = $libredis->get_connection("127.0.0.1");
-//set a key
-$batch = $libredis->create_batch();
-$batch->set('hello', 'world');
-$batch->execute($connection); 
-//now fetch the key
-$batch = $libredis->create_batch();
-$batch->get('hello');
-$batch->execute($connection);
-while($batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
-    echo $reply_value, PHP_EOL;    
-}
-*/
-
-/*
-$libredis = Libredis();
-$connection1 = $libredis->get_connection("127.0.0.1:6973");
-$connection2 = $libredis->get_connection("127.0.0.1:6980");
-$batch1 = $libredis->create_batch();
-$batch1->set('hello', 'world');
-$batch2 = $libredis->create_batch();
-$batch2->set('hello2', 'world2');
-$executor = $libredis->create_executor();
-$executor->add($connection1, $batch1);
-$executor->add($connection2, $batch2);
-$executor->execute(); // execute all batches against all connections in parallel.
-*/
 
 ?>

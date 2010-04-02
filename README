@@ -35,7 +35,7 @@ $batch->execute($connection);
 $batch = $libredis->create_batch();
 $batch->get('hello');
 $batch->execute($connection);
-while($batch->next_reply(&$reply_type, &$reply_value, &$reply_length)) {
+while($batch->next_reply($reply_type, $reply_value, $reply_length)) {
     echo $reply_value, PHP_EOL;    
 }
 
