@@ -147,6 +147,16 @@ function test_simple() {
 	}
 }
 
+function test_leak() {
+    global $libredis;
+    $batches = array();
+    for($i = 0; $i < 100; $i++) {
+        $batches[] = $libredis->create_batch("GET $key\r\n", 1);
+    }
+    //$x = new Blaat();
+    throw new Exception("piet");
+}
+
 function test_destroy() {
     global $libredis;
     $connection = $libredis->get_connection("$ip:6379");
@@ -203,7 +213,8 @@ function test_convenience()
 
 //test_ketama();
 //test_simple();
-test_mget();
+test_leak();
+//test_mget();
 //test_destroy();
 //test_integer_reply();
 //test_connections();

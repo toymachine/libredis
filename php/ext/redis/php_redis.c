@@ -31,6 +31,7 @@ zend_class_entry *connection_ce;
 zend_class_entry *redis_ce;
 zend_class_entry *executor_ce;
 
+//TODO proper php module globals?:
 Module g_module;
 HashTable g_connections;
 
@@ -467,6 +468,21 @@ PHP_MSHUTDOWN_FUNCTION(redis)
 	return SUCCESS;
 }
 
+PHP_RINIT_FUNCTION(redis)
+{
+    syslog(LOG_DEBUG, "libredis request init");
+
+    return SUCCESS;
+}
+
+PHP_RSHUTDOWN_FUNCTION(redis)
+{
+	syslog(LOG_DEBUG, "libredis request shutdown complete, final alloc: %d\n", g_module.allocated);
+
+
+	return SUCCESS;
+}
+
 static function_entry redis_functions[] = {
     PHP_FE(Libredis, NULL)
     {NULL, NULL, NULL}
@@ -480,8 +496,8 @@ zend_module_entry redis_module_entry = {
     redis_functions, /* functions */
     PHP_MINIT(redis), /* MINIT */
     PHP_MSHUTDOWN(redis), /* MSHUTDOWN */
-    NULL,
-    NULL,
+    PHP_RINIT(redis), /* RINIT */
+    PHP_RSHUTDOWN(redis), /* RSHUTDOWN */
     NULL,
 #if ZEND_MODULE_API_NO >= 20010901
     PHP_REDIS_VERSION,
