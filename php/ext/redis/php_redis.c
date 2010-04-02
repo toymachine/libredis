@@ -470,6 +470,8 @@ PHP_MSHUTDOWN_FUNCTION(redis)
 
 PHP_RINIT_FUNCTION(redis)
 {
+	openlog("libredis", 0, LOG_LOCAL2);
+
     syslog(LOG_DEBUG, "libredis request init");
 
     return SUCCESS;
