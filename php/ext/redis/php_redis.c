@@ -448,6 +448,7 @@ PHP_MINIT_FUNCTION(redis)
     g_module.alloc_free = free;
     Module_init(&g_module);
 
+    openlog("libredis", 0, LOG_LOCAL2);
     syslog(LOG_DEBUG, "libredis module init");
 
     return SUCCESS;
@@ -463,6 +464,7 @@ PHP_MSHUTDOWN_FUNCTION(redis)
 
 	Module_free();
 
+	openlog("libredis", 0, LOG_LOCAL2);
 	syslog(LOG_DEBUG, "libredis module shutdown complete, final alloc: %d\n", g_module.allocated);
 
 	return SUCCESS;
@@ -471,7 +473,6 @@ PHP_MSHUTDOWN_FUNCTION(redis)
 PHP_RINIT_FUNCTION(redis)
 {
 	openlog("libredis", 0, LOG_LOCAL2);
-
     syslog(LOG_DEBUG, "libredis request init");
 
     return SUCCESS;
@@ -479,6 +480,7 @@ PHP_RINIT_FUNCTION(redis)
 
 PHP_RSHUTDOWN_FUNCTION(redis)
 {
+	openlog("libredis", 0, LOG_LOCAL2);
 	syslog(LOG_DEBUG, "libredis request shutdown complete, final alloc: %d\n", g_module.allocated);
 
 
