@@ -16,4 +16,7 @@ php_ext:
 clean:
 	cd src; rm -rf *.o
 	rm -rf lib
+	-find . -name *.pyc -exec rm -rf {} \;
+	-find . -name *.so -exec rm -rf {} \;
+	-find . -name '*~' -exec rm -rf {} \;
 	
