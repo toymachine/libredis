@@ -218,8 +218,8 @@ function test_convenience()
 
 //test_ketama();
 //test_simple();
-test_leak();
-//test_mget();
+//test_leak();
+test_mget();
 //test_destroy();
 //test_integer_reply();
 //test_connections();

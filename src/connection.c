@@ -392,6 +392,7 @@ struct _Executor
 {
 	int numpairs;
 	int max_fd;
+	int numevents;
 	fd_set readfds;
 	fd_set writefds;
 	struct _Pair pairs[MAX_PAIRS];
@@ -407,6 +408,7 @@ Executor *Executor_new()
 		return NULL;
 	}
 	executor->numpairs = 0;
+	executor->numevents = 0;
 	executor->max_fd = 0;
 	FD_ZERO(&executor->readfds);
 	FD_ZERO(&executor->writefds);
@@ -452,12 +454,13 @@ int Executor_execute(Executor *executor, int timeout_ms)
 	executor->end_tm_ms = TIMESPEC_TO_MS(tm) + ((float)timeout_ms);
 	DEBUG(("Executor end_tm_ms: %3.2f\n", executor->end_tm_ms));
 
+	executor->numevents = 0;
 	for(int i = 0; i < executor->numpairs; i++) {
 		struct _Pair *pair = &executor->pairs[i];
 		Connection_execute_start(pair->connection, executor, pair->batch);
 	}
 
-	while(executor->max_fd > 0) { //for as long there are outstanding events
+	while(executor->numevents > 0) { //for as long there are outstanding events
 
 		//figure out how many ms left for this execution
 		struct timespec tm;
@@ -478,11 +481,10 @@ int Executor_execute(Executor *executor, int timeout_ms)
 		writefds = executor->writefds;
 
 		//do the select
-		DEBUG(("Executor start select max_fd %d\n", executor->max_fd));
+		DEBUG(("Executor start select max_fd %d, num_events: %d\n", executor->max_fd, executor->numevents));
 		int res = select(executor->max_fd + 1, &readfds, &writefds, NULL, &tv);
 		DEBUG(("Executor select res %d\n", res));
 
-		executor->max_fd = 0;
 		for(int i = 0; i < executor->numpairs; i++) {
 			struct _Pair *pair = &executor->pairs[i];
 			Connection *connection = pair->connection;
@@ -490,10 +492,12 @@ int Executor_execute(Executor *executor, int timeout_ms)
 			if(FD_ISSET(connection->sockfd, &readfds)) {
 				event |= EVENT_READ;
 				FD_CLR(connection->sockfd, &executor->readfds);
+				executor->numevents -= 1;
 			}
 			if(FD_ISSET(connection->sockfd, &writefds)) {
 				event |= EVENT_WRITE;
 				FD_CLR(connection->sockfd, &executor->writefds);
+				executor->numevents -= 1;
 			}
 			if(event > 0) {
 				Connection_handle_event(connection, event);
@@ -518,13 +522,15 @@ void Executor_notify_event(Executor *executor, Connection *connection, EventType
 
 	if(event & EVENT_READ) {
 		FD_SET(connection->sockfd, &executor->readfds);
+		executor->numevents += 1;
 	}
 
 	if(event & EVENT_WRITE) {
 		FD_SET(connection->sockfd, &executor->writefds);
+		executor->numevents += 1;
 	}
 
-	DEBUG(("executor notify event added: fd: %d, type: %c, max_fd: %d\n", connection->sockfd, event == EVENT_READ ? 'R' : 'W', executor->max_fd));
+	DEBUG(("executor notify event added: fd: %d, type: %c, max_fd: %d, num_events: %d\n", connection->sockfd, event == EVENT_READ ? 'R' : 'W', executor->max_fd, executor->numevents));
 }
 
 

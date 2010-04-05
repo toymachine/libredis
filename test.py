@@ -64,8 +64,8 @@ def test_mget():
     
 #    M = 1000
 #    N = 200
-    M = 10
-    N = 10
+    M = 1000
+    N = 200
     keys = ['piet%d' % i for i in range(N)]
 
     for i in range(N):
@@ -74,7 +74,7 @@ def test_mget():
         #print '******', repr(redis.get('piet%d' % i))
     start = time.time()
     for i in range(M):
-        print redis.mget(*keys)
+        redis.mget(*keys)
     end = time.time()
     print (N * M) / (end - start)
     
