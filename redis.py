@@ -5,29 +5,36 @@ from ctypes import *
 import sys
 if '--debug' in sys.argv:
     libredis = cdll.LoadLibrary("Debug/libredis.so")
-else:
+elif '--release' in sys.argv:
     libredis = cdll.LoadLibrary("Release/libredis.so")
+else:
+    libredis = cdll.LoadLibrary("lib/libredis.so")
 
-libredis.Module_init()
+libredis.Module_init(0)
 atexit.register(libredis.Module_free)
+
+DEFAULT_TIMEOUT_MS = 3000
 
 class Connection(object):
     def __init__(self, addr):
         self._connection = libredis.Connection_new(addr)
 
-    def get(self, key):
+    def get(self, key, timeout_ms = DEFAULT_TIMEOUT_MS):
         batch = Batch()
-        batch.writef("GET %s\r\n", key)
-        batch.add_command()
-        self.execute(batch)
-        reply = batch.pop_reply()
-        return reply.value
+        batch.write("GET %s\r\n" % key, 1)
+        return self._simple_exec(batch, timeout_ms)
     
-    def execute(self, batch, dispatch = True):    
-        libredis.Connection_execute(self._connection, batch._batch)
-        if dispatch:
-            libredis.Module_dispatch()
-
+    def _simple_exec(self, batch, timeout_ms):
+        executor = libredis.Executor_new()
+        try:
+            libredis.Executor_add(executor, self._connection, batch._batch)
+            libredis.Executor_execute(executor, timeout_ms)
+        finally:
+            libredis.Executor_free(executor)
+        #reply = batch.pop_reply()
+        #return reply.value
+        return "BlaatTODO"
+       
     def free(self):
         libredis.Connection_free(self._connection)
         self._connection = None
@@ -128,12 +135,9 @@ class Batch(object):
     def __init__(self):
         self._batch = libredis.Batch_new()
 
-    def writef(self, format, *args):
-        libredis.Batch_writef(self._batch, format, *args)
+    def write(self, cmd, nr_commands):
+        libredis.Batch_write(self._batch, cmd, len(cmd), nr_commands)
 
-    def add_command(self):
-        libredis.Batch_add_command(self._batch)
-    
     def next_reply(self):
         return Reply.from_next(self)
 

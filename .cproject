@@ -30,15 +30,15 @@
 <option id="gnu.c.compiler.exe.debug.option.debugging.level.1138410845" name="Debug Level" superClass="gnu.c.compiler.exe.debug.option.debugging.level" value="gnu.c.debugging.level.max" valueType="enumerated"/>
 <option id="gnu.c.compiler.option.warnings.pedantic.549157664" name="Pedantic (-pedantic)" superClass="gnu.c.compiler.option.warnings.pedantic" value="true" valueType="boolean"/>
 <option id="gnu.c.compiler.option.misc.other.137855241" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -std=gnu99" valueType="string"/>
-<option id="gnu.c.compiler.option.include.paths.1814414852" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
+<option id="gnu.c.compiler.option.include.paths.1814414852" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/libredis/include}&quot;"/>
 </option>
 <inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.1445887938" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 </tool>
 <tool id="cdt.managedbuild.tool.gnu.c.linker.exe.debug.894027643" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.debug">
 <option id="gnu.c.link.option.libs.260277660" name="Libraries (-l)" superClass="gnu.c.link.option.libs" valueType="libs">
-<listOptionValue builtIn="false" value="event"/>
 <listOptionValue builtIn="false" value="m"/>
+<listOptionValue builtIn="false" value="rt"/>
 </option>
 <option defaultValue="true" id="gnu.c.link.option.shared.175267329" name="Shared (-shared)" superClass="gnu.c.link.option.shared" valueType="boolean"/>
 <inputType id="cdt.managedbuild.tool.gnu.c.linker.input.1086609857" superClass="cdt.managedbuild.tool.gnu.c.linker.input">
@@ -427,15 +427,15 @@
 </option>
 <option id="gnu.c.compiler.option.warnings.pedantic.389505680" name="Pedantic (-pedantic)" superClass="gnu.c.compiler.option.warnings.pedantic" value="true" valueType="boolean"/>
 <option id="gnu.c.compiler.option.misc.other.808614396" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -std=gnu99" valueType="string"/>
-<option id="gnu.c.compiler.option.include.paths.1705031954" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
+<option id="gnu.c.compiler.option.include.paths.1705031954" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/libredis/include}&quot;"/>
 </option>
 <inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.2042413195" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 </tool>
 <tool id="cdt.managedbuild.tool.gnu.c.linker.exe.release.699059502" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.release">
 <option id="gnu.c.link.option.libs.1845595822" name="Libraries (-l)" superClass="gnu.c.link.option.libs" valueType="libs">
-<listOptionValue builtIn="false" value="event"/>
 <listOptionValue builtIn="false" value="m"/>
+<listOptionValue builtIn="false" value="rt"/>
 </option>
 <option defaultValue="true" id="gnu.c.link.option.shared.488151747" name="Shared (-shared)" superClass="gnu.c.link.option.shared" valueType="boolean"/>
 <inputType id="cdt.managedbuild.tool.gnu.c.linker.input.1004678549" superClass="cdt.managedbuild.tool.gnu.c.linker.input">
@@ -825,15 +825,15 @@
 <option id="gnu.c.compiler.option.warnings.pedantic.820057054" name="Pedantic (-pedantic)" superClass="gnu.c.compiler.option.warnings.pedantic" value="true" valueType="boolean"/>
 <option id="gnu.c.compiler.option.misc.other.42614541" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -std=gnu99" valueType="string"/>
 <option id="gnu.c.compiler.option.debugging.gprof.936284882" name="Generate gprof information (-pg)" superClass="gnu.c.compiler.option.debugging.gprof" value="true" valueType="boolean"/>
-<option id="gnu.c.compiler.option.include.paths.1547348632" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
+<option id="gnu.c.compiler.option.include.paths.1547348632" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/libredis/include}&quot;"/>
 </option>
 <inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.603495480" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 </tool>
 <tool id="cdt.managedbuild.tool.gnu.c.linker.exe.release.1887659273" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.release">
 <option id="gnu.c.link.option.libs.585879361" name="Libraries (-l)" superClass="gnu.c.link.option.libs" valueType="libs">
-<listOptionValue builtIn="false" value="event"/>
 <listOptionValue builtIn="false" value="m"/>
+<listOptionValue builtIn="false" value="rt"/>
 </option>
 <option id="gnu.c.link.option.debugging.gprof.1471329691" name="Generate gprof information (-pg)" superClass="gnu.c.link.option.debugging.gprof" value="true" valueType="boolean"/>
 <option defaultValue="true" id="gnu.c.link.option.shared.402921570" name="Shared (-shared)" superClass="gnu.c.link.option.shared" valueType="boolean"/>
@@ -1226,15 +1226,15 @@
 <option id="gnu.c.compiler.exe.debug.option.debugging.level.1614170341" name="Debug Level" superClass="gnu.c.compiler.exe.debug.option.debugging.level" value="gnu.c.debugging.level.max" valueType="enumerated"/>
 <option id="gnu.c.compiler.option.warnings.pedantic.1143534917" name="Pedantic (-pedantic)" superClass="gnu.c.compiler.option.warnings.pedantic" value="true" valueType="boolean"/>
 <option id="gnu.c.compiler.option.misc.other.213672354" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -std=gnu99" valueType="string"/>
-<option id="gnu.c.compiler.option.include.paths.2006113487" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
+<option id="gnu.c.compiler.option.include.paths.2006113487" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/libredis/include}&quot;"/>
 </option>
 <inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.1952509459" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 </tool>
 <tool id="cdt.managedbuild.tool.gnu.c.linker.exe.debug.661523374" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.debug">
 <option id="gnu.c.link.option.libs.659942975" name="Libraries (-l)" superClass="gnu.c.link.option.libs" valueType="libs">
-<listOptionValue builtIn="false" value="event"/>
 <listOptionValue builtIn="false" value="m"/>
+<listOptionValue builtIn="false" value="rt"/>
 </option>
 <option id="gnu.c.link.option.shared.1923855540" name="Shared (-shared)" superClass="gnu.c.link.option.shared"/>
 <inputType id="cdt.managedbuild.tool.gnu.c.linker.input.1784674827" superClass="cdt.managedbuild.tool.gnu.c.linker.input">

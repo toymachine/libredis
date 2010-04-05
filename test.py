@@ -22,7 +22,8 @@ def timer():
 def test_simple():
     connection = Connection("127.0.0.1:6379")
 
-    for j in range(10):
+    N = 10
+    for j in range(N):
         print repr(connection.get('blaat'))
         
 def test_ketama():
@@ -93,7 +94,7 @@ def profile(f = None):
 
 if __name__ == '__main__':
     #test_ketama()
-    #test_simple()
+    test_simple()
     #profile(test_mget)
-    test_mget()
+    #test_mget()
     

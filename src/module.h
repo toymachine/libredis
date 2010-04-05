@@ -12,6 +12,4 @@
 
 extern Module *g_module;
 
-void Module_dispatch();
-
 #endif /* MODULE_H_ */

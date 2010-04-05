@@ -8,6 +8,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/select.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
@@ -21,7 +22,6 @@
 #include <time.h>
 
 #include "redis.h"
-#include "event.h"
 #include "common.h"
 #include "buffer.h"
 #include "connection.h"
@@ -40,6 +40,12 @@ typedef enum _ConnectionState
     CS_ABORTED = 3
 } ConnectionState;
 
+typedef enum _EventType
+{
+	EVENT_READ = 1,
+	EVENT_WRITE = 2,
+	EVENT_TIMEOUT = 4,
+} EventType;
 
 struct _Connection
 {
@@ -47,8 +53,6 @@ struct _Connection
 	struct sockaddr_in sa; //parsed addres
 	int sockfd;
 	ConnectionState state;
-	struct event event_read;
-	struct event event_write;
 	Batch *current_batch;
 	Executor *current_executor;
 	ReplyParser *parser;
@@ -56,13 +60,11 @@ struct _Connection
 
 //forward decls.
 void Connection_abort(Connection *connection, const char *format,  ...);
-void Connection_execute(Connection *connection, Executor *executor, Batch *batch);
-void Connection_event_add(Connection *connection, struct event *event);
+void Connection_execute_start(Connection *connection, Executor *executor, Batch *batch);
 void Connection_write_data(Connection *connection);
 void Connection_read_data(Connection *connection);
-void Connection_handle_event(int fd, short flags, void *data);
 
-void Executor_set_timeout(Executor *executor, struct timeval *tv);
+void Executor_notify_event(Executor *executor, Connection *connection, EventType event);
 
 Connection *Connection_new(const char *in_addr)
 {
@@ -112,7 +114,6 @@ Connection *Connection_new(const char *in_addr)
 
 	connection->sockfd = 0;
 
-	//
 	return connection;
 }
 
@@ -139,10 +140,6 @@ int Connection_create_socket(Connection *connection)
 		Connection_abort(connection, "could not create socket");
 		return -1;
 	}
-
-	//prepare libevent structures
-	event_set(&connection->event_read, connection->sockfd, EV_READ, &Connection_handle_event, (void *)connection);
-	event_set(&connection->event_write, connection->sockfd, EV_WRITE, &Connection_handle_event, (void *)connection);
 
 	//set socket in non-blocking mode
 	int flags;
@@ -184,10 +181,6 @@ void Connection_abort(Connection *connection, const char *format,  ...)
 	   CS_CONNECTING == connection->state) {
 		assert(connection->sockfd > 0);
 
-		//unset outstanding events
-		event_del(&connection->event_read);
-		event_del(&connection->event_write);
-
 		//close the socket
 		close(connection->sockfd);
 	}
@@ -198,7 +191,7 @@ void Connection_abort(Connection *connection, const char *format,  ...)
 	DEBUG(("Connection aborted\n"));
 }
 
-void Connection_execute(Connection *connection, Executor *executor, Batch *batch)
+void Connection_execute_start(Connection *connection, Executor *executor, Batch *batch)
 {
 	DEBUG(("Connection exec\n"));
 
@@ -222,25 +215,8 @@ void Connection_execute(Connection *connection, Executor *executor, Batch *batch
 
 	//kick off reading when socket becomes readable
 	if(CS_CONNECTED == connection->state) {
-		Connection_event_add(connection, &connection->event_read);
+		Executor_notify_event(connection->current_executor, connection, EVENT_READ);
 	}
-}
-
-void Connection_event_add(Connection *connection, struct event *event)
-{
-	if(CS_ABORTED == connection->state) {
-		return;
-	}
-	assert(connection->current_batch != NULL);
-	assert(connection->current_executor != NULL);
-
-	struct timeval tv;
-	Executor_set_timeout(connection->current_executor, &tv);
-	if(-1 == event_add(event, &tv)) {
-		Connection_abort(connection, "could not add event");
-		return;
-	}
-	DEBUG(("connection ev add: fd: %d, type: %c\n", connection->sockfd, event == &connection->event_read ? 'R' : 'W'));
 }
 
 void Connection_write_data(Connection *connection)
@@ -264,7 +240,7 @@ void Connection_write_data(Connection *connection)
 				//normal async connect
 				connection->state = CS_CONNECTING;
 				DEBUG(("async connecting, adding write event\n"));
-				Connection_event_add(connection, &connection->event_write);
+				Executor_notify_event(connection->current_executor, connection, EVENT_WRITE);
 				DEBUG(("write event added, now returning\n"));
 				return;
 			}
@@ -294,7 +270,7 @@ void Connection_write_data(Connection *connection)
 		}
 		else {
 			connection->state = CS_CONNECTED;
-			Connection_event_add(connection, &connection->event_read);
+			Executor_notify_event(connection->current_executor, connection, EVENT_READ);
 		}
 	}
 
@@ -308,7 +284,7 @@ void Connection_write_data(Connection *connection)
 			DEBUG(("bfr send res: %d\n", res));
 			if(res == -1) {
 				if(errno == EAGAIN) {
-					Connection_event_add(connection, &connection->event_write);
+					Executor_notify_event(connection->current_executor, connection, EVENT_WRITE);
 					return;
 				}
 				else {
@@ -350,7 +326,7 @@ void Connection_read_data(Connection *connection)
 #endif
 			if(res == -1) {
 				if(errno == EAGAIN) {
-					Connection_event_add(connection, &connection->event_read);
+					Executor_notify_event(connection->current_executor, connection, EVENT_READ);
 					return;
 				}
 				else {
@@ -375,18 +351,16 @@ void Connection_read_data(Connection *connection)
 	}
 }
 
-void Connection_handle_event(int fd, short flags, void *data)
+void Connection_handle_event(Connection *connection, EventType event)
 {
-	Connection *connection = (Connection *)data;
-
 	if(CS_ABORTED == connection->state) {
 		return;
 	}
 
-	DEBUG(("con event, fd: %d, state: %d, flags: %d, readable: %d, writeable: %d, timeout: %d\n", connection->sockfd,
-			connection->state, flags, (flags & EV_READ) ? 1 : 0, (flags & EV_WRITE) ? 1 : 0, (flags & EV_TIMEOUT) ? 1 : 0 ));
+	DEBUG(("con event, fd: %d, state: %d, event: %d, readable: %d, writeable: %d, timeout: %d\n", connection->sockfd,
+			connection->state, event, (event & EVENT_READ) ? 1 : 0, (event & EVENT_WRITE) ? 1 : 0, (event & EVENT_TIMEOUT) ? 1 : 0 ));
 
-	if(flags & EV_TIMEOUT) {
+	if(event & EVENT_TIMEOUT) {
 		if(CS_CONNECTING == connection->state) {
 			Connection_abort(connection, "connect timeout");
 		}
@@ -396,16 +370,15 @@ void Connection_handle_event(int fd, short flags, void *data)
 		return;
 	}
 
-	if(flags & EV_WRITE) {
+	if(event & EVENT_WRITE) {
 		Connection_write_data(connection);
 	}
 
-	if(flags & EV_READ) {
+	if(event & EVENT_READ) {
 		Connection_read_data(connection);
 	}
 
 }
-
 
 #define MAX_PAIRS 1024
 
@@ -418,6 +391,9 @@ struct _Pair
 struct _Executor
 {
 	int numpairs;
+	int max_fd;
+	fd_set readfds;
+	fd_set writefds;
 	struct _Pair pairs[MAX_PAIRS];
 	double end_tm_ms;
 };
@@ -431,6 +407,9 @@ Executor *Executor_new()
 		return NULL;
 	}
 	executor->numpairs = 0;
+	executor->max_fd = 0;
+	FD_ZERO(&executor->readfds);
+	FD_ZERO(&executor->writefds);
 	return executor;
 }
 
@@ -445,6 +424,11 @@ void Executor_free(Executor *executor)
 
 int Executor_add(Executor *executor, Connection *connection, Batch *batch)
 {
+	assert(executor != NULL);
+	assert(connection != NULL);
+	assert(connection->state != CS_ABORTED);
+	assert(batch != NULL);
+
 	if(executor->numpairs >= MAX_PAIRS) {
 		SETERROR(("executor is full"));
 		return -1;
@@ -464,33 +448,83 @@ int Executor_execute(Executor *executor, int timeout_ms)
 	DEBUG(("Executor execute start\n"));
 	struct timespec tm;
 	clock_gettime(CLOCK_MONOTONIC, &tm);
+	DEBUG(("Executor start_tm_ms: %3.2f\n", TIMESPEC_TO_MS(tm)));
 	executor->end_tm_ms = TIMESPEC_TO_MS(tm) + ((float)timeout_ms);
 	DEBUG(("Executor end_tm_ms: %3.2f\n", executor->end_tm_ms));
 
 	for(int i = 0; i < executor->numpairs; i++) {
 		struct _Pair *pair = &executor->pairs[i];
-		Connection_execute(pair->connection, executor, pair->batch);
+		Connection_execute_start(pair->connection, executor, pair->batch);
 	}
-	Module_dispatch();
+
+	while(executor->max_fd > 0) { //for as long there are outstanding events
+
+		//copy filedes. sets, because select is going to modify them
+		fd_set readfds;
+		fd_set writefds;
+		readfds = executor->readfds;
+		writefds = executor->writefds;
+
+		//figure out how many ms left for this execution
+		struct timespec tm;
+		clock_gettime(CLOCK_MONOTONIC, &tm);
+		double cur_tm_ms = TIMESPEC_TO_MS(tm);
+		DEBUG(("Executor cur_tm: %3.2f\n", cur_tm_ms));
+		double left_ms = executor->end_tm_ms - cur_tm_ms;
+		DEBUG(("Time left: %3.2f\n", left_ms));
+		struct timeval tv;
+		tv.tv_sec = (time_t)left_ms / 1000.0;
+		tv.tv_usec = (left_ms - (tv.tv_sec * 1000.0)) * 1000.0;
+		DEBUG(("Timeout: %d sec, %d usec\n", (int)tv.tv_sec, (int)tv.tv_usec));
+
+		//do the select
+		DEBUG(("Executor start select max_fd %d\n", executor->max_fd));
+		int res = select(executor->max_fd + 1, &readfds, &writefds, NULL, &tv);
+		DEBUG(("Executor select res %d\n", res));
+
+		executor->max_fd = 0;
+
+		for(int i = 0; i < executor->numpairs; i++) {
+			struct _Pair *pair = &executor->pairs[i];
+			Connection *connection = pair->connection;
+			EventType event = 0;
+			if(FD_ISSET(connection->sockfd, &readfds)) {
+				event |= EVENT_READ;
+				FD_CLR(connection->sockfd, &executor->readfds);
+			}
+			if(FD_ISSET(connection->sockfd, &writefds)) {
+				event |= EVENT_WRITE;
+				FD_CLR(connection->sockfd, &executor->writefds);
+			}
+			if(event > 0) {
+				Connection_handle_event(connection, event);
+			}
+		}
+	}
+
 	DEBUG(("Executor execute done\n"));
 	return 0;
 }
 
-void Executor_set_timeout(Executor *executor, struct timeval *tv)
+void Executor_notify_event(Executor *executor, Connection *connection, EventType event)
 {
-	//figure out how many ms left for this execution
-	struct timespec tm;
-	clock_gettime(CLOCK_MONOTONIC, &tm);
-	double cur_tm_ms = TIMESPEC_TO_MS(tm);
-	DEBUG(("Executor cur_tm: %3.2f\n", cur_tm_ms));
-	double left_ms = executor->end_tm_ms - cur_tm_ms;
-	DEBUG(("Time left: %3.2f\n", left_ms));
+	assert(executor != NULL);
+	assert(connection != NULL);
+	assert(connection->sockfd != 0);
 
-	//set timeout based on that
-	tv->tv_sec = (time_t)left_ms / 1000.0;
-	tv->tv_usec = (left_ms - (tv->tv_sec * 1000.0)) * 1000.0;
+	if(connection->sockfd > executor->max_fd) {
+		executor->max_fd = connection->sockfd;
+	}
 
-	DEBUG(("Timeout: %d sec, %d usec\n", (int)tv->tv_sec, (int)tv->tv_usec));
+	if(event & EVENT_READ) {
+		FD_SET(connection->sockfd, &executor->readfds);
+	}
+
+	if(event & EVENT_WRITE) {
+		FD_SET(connection->sockfd, &executor->writefds);
+	}
+
+	DEBUG(("executor notify event added: fd: %d, type: %c, max_fd: %d\n", connection->sockfd, event == EVENT_READ ? 'R' : 'W', executor->max_fd));
 }
 
 

@@ -7,7 +7,6 @@
 */
 
 #include "module.h"
-#include "event.h"
 #include "reply.h"
 #include "batch.h"
 
@@ -32,15 +31,7 @@ void Module_init(Module *module)
 	if(g_module->alloc_free == NULL) {
 		g_module->alloc_free = free;
 	}
-
-	event_init();
-}
-
-void Module_dispatch()
-{
-	DEBUG(("Module before dispatch\n"));
-	event_dispatch();
-	DEBUG(("Module after dispatch\n"));
+	DEBUG(("start alloc: %d\n", g_module->allocated));
 }
 
 void Module_free()
