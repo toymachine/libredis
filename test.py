@@ -94,7 +94,7 @@ def profile(f = None):
 
 if __name__ == '__main__':
     #test_ketama()
-    test_simple()
+    #test_simple()
     #profile(test_mget)
-    #test_mget()
+    test_mget()
     

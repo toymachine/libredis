@@ -459,12 +459,6 @@ int Executor_execute(Executor *executor, int timeout_ms)
 
 	while(executor->max_fd > 0) { //for as long there are outstanding events
 
-		//copy filedes. sets, because select is going to modify them
-		fd_set readfds;
-		fd_set writefds;
-		readfds = executor->readfds;
-		writefds = executor->writefds;
-
 		//figure out how many ms left for this execution
 		struct timespec tm;
 		clock_gettime(CLOCK_MONOTONIC, &tm);
@@ -477,13 +471,18 @@ int Executor_execute(Executor *executor, int timeout_ms)
 		tv.tv_usec = (left_ms - (tv.tv_sec * 1000.0)) * 1000.0;
 		DEBUG(("Timeout: %d sec, %d usec\n", (int)tv.tv_sec, (int)tv.tv_usec));
 
+		//copy filedes. sets, because select is going to modify them
+		fd_set readfds;
+		fd_set writefds;
+		readfds = executor->readfds;
+		writefds = executor->writefds;
+
 		//do the select
 		DEBUG(("Executor start select max_fd %d\n", executor->max_fd));
 		int res = select(executor->max_fd + 1, &readfds, &writefds, NULL, &tv);
 		DEBUG(("Executor select res %d\n", res));
 
 		executor->max_fd = 0;
-
 		for(int i = 0; i < executor->numpairs; i++) {
 			struct _Pair *pair = &executor->pairs[i];
 			Connection *connection = pair->connection;
@@ -511,6 +510,7 @@ void Executor_notify_event(Executor *executor, Connection *connection, EventType
 	assert(executor != NULL);
 	assert(connection != NULL);
 	assert(connection->sockfd != 0);
+	assert(connection->state != CS_ABORTED);
 
 	if(connection->sockfd > executor->max_fd) {
 		executor->max_fd = connection->sockfd;

@@ -55,6 +55,7 @@ Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len)
 {
 	Reply *reply;
 	Reply_list_alloc(&reply);
+	DEBUG(("Reply_new, type: %d\n", type));
 	reply->type = type;
 	reply->data = data;
 	reply->offset = offset;
