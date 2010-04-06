@@ -484,7 +484,8 @@ int Executor_execute(Executor *executor, int timeout_ms)
 	}
 
 	int select_result = 1;
-	while(executor->numevents > 0 && select_result > 0) { //for as long there are outstanding events
+	//for as long there are outstanding events and no error or timeout occurred:
+	while(executor->numevents > 0 && select_result > 0) {
 
 		//figure out how many ms left for this execution
 		struct timeval tv;
