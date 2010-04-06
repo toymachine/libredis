@@ -38,6 +38,11 @@ HashTable g_batch; //for keeping track of batch instances
 HashTable g_ketama; //for keeping track of ketama instances
 HashTable g_executor; //for keeping track of executor instances
 
+//some forward decls
+void Connection_execute_simple(Connection *connection, Batch *batch, long timeout);
+void Batch_write_set(Batch *batch, char *key, int key_len, char *value, int value_len);
+void Batch_write_get(Batch *batch, char *key, int key_len);
+
 /**************** KETAMA ***********************/
 
 
@@ -156,6 +161,14 @@ function_entry executor_methods[] = {
 #define Connection_getThis() T_getThis(Connection, connection_ce)
 #define Connection_setThis(p) T_setThis(p, connection_ce)
 
+void Connection_execute_simple(Connection *connection, Batch *batch, long timeout)
+{
+	Executor *executor = Executor_new();
+	Executor_add(executor, connection, batch);
+	Executor_execute(executor, timeout);
+	Executor_free(executor);
+}
+
 PHP_METHOD(Connection, __destruct)
 {
 	//note that we not 'free' the real connection, because that is persistent
@@ -172,16 +185,67 @@ PHP_METHOD(Connection, execute)
 	}
 
 	Batch *batch = T_fromObj(Batch, batch_ce, z_batch);
-	Executor *executor = Executor_new();
-	Executor_add(executor, Connection_getThis(), batch);
-	Executor_execute(executor, timeout);
-	Executor_free(executor);
+	Connection_execute_simple(Connection_getThis(), batch, timeout);
+}
+
+PHP_METHOD(Connection, set)
+{
+	char *key;
+	int key_len;
+	char *value;
+	int value_len;
+	long timeout = DEFAULT_TIMEOUT_MS;
+
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "ss|l", &key, &key_len, &value, &value_len, &timeout) == FAILURE) {
+		RETURN_NULL();
+	}
+
+	Batch *batch = Batch_new();
+	Batch_write_set(batch, key, key_len, value, value_len);
+	Connection_execute_simple(Connection_getThis(), batch, timeout);
+}
+
+PHP_METHOD(Connection, get)
+{
+	char *key;
+	int key_len;
+	long timeout = DEFAULT_TIMEOUT_MS;
+
+	if (zend_parse_parameters_ex(0, ZEND_NUM_ARGS() TSRMLS_CC, "s|l", &key, &key_len, &timeout) == FAILURE) {
+		RETURN_BOOL(0);
+	}
+
+	Batch *batch = Batch_new();
+	Batch_write_get(batch, key, key_len);
+	Connection_execute_simple(Connection_getThis(), batch, timeout);
+
+	ReplyType c_reply_type;
+	char *c_reply_value;
+	size_t c_reply_length;
+	int res = Batch_next_reply(batch, &c_reply_type, &c_reply_value, &c_reply_length);
+
+    if(c_reply_type == RT_BULK) {
+		if(c_reply_value != NULL && c_reply_length > 0) {
+			RETURN_STRINGL(c_reply_value, c_reply_length, 1);
+		}
+		else {
+			RETURN_EMPTY_STRING();
+		}
+    }
+    else if(c_reply_type == RT_BULK_NIL) {
+    	RETURN_NULL();
+    }
+    else {
+    	RETURN_BOOL(0);
+    }
 }
 
 
 function_entry connection_methods[] = {
     PHP_ME(Connection,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
     PHP_ME(Connection,  execute,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Connection,  set,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Connection,  get,           NULL, ZEND_ACC_PUBLIC)
     {NULL, NULL, NULL}
 };
 
@@ -191,6 +255,23 @@ function_entry connection_methods[] = {
 #define Batch_getThis() T_getThis(Batch, batch_ce)
 #define Batch_setThis(p) T_setThis(p, batch_ce)
 
+void Batch_write_set(Batch *batch, char *key, int key_len, char *value, int value_len)
+{
+	Batch_write(batch, "SET ", 4, 0);
+	Batch_write(batch, key, key_len, 0);
+	char buff[16];
+	int bufl = snprintf(buff, 16, " %d\r\n", value_len);
+	Batch_write(batch, buff, bufl, 0);
+	Batch_write(batch, value, value_len, 0);
+	Batch_write(batch, "\r\n", 2, 1);
+}
+
+void Batch_write_get(Batch *batch, char *key, int key_len)
+{
+	Batch_write(batch, "GET ", 4, 0);
+	Batch_write(batch, key, key_len, 0);
+	Batch_write(batch, "\r\n", 2, 1);
+}
 
 PHP_METHOD(Batch, __destruct)
 {
@@ -224,14 +305,7 @@ PHP_METHOD(Batch, set)
 		RETURN_NULL();
 	}
 
-	Batch *batch = Batch_getThis();
-	Batch_write(batch, "SET ", 4, 0);
-	Batch_write(batch, key, key_len, 0);
-	char buff[16];
-	int bufl = snprintf(buff, 16, " %d\r\n", value_len);
-	Batch_write(batch, buff, bufl, 0);
-	Batch_write(batch, value, value_len, 0);
-	Batch_write(batch, "\r\n", 2, 1);
+	Batch_write_set(Batch_getThis(), key, key_len, value, value_len);
 
 	RETURN_ZVAL(getThis(), 1, 0);
 }
@@ -245,10 +319,7 @@ PHP_METHOD(Batch, get)
 		RETURN_NULL();
 	}
 
-	Batch *batch = Batch_getThis();
-	Batch_write(batch, "GET ", 4, 0);
-	Batch_write(batch, key, key_len, 0);
-	Batch_write(batch, "\r\n", 2, 1);
+	Batch_write_get(Batch_getThis(), key, key_len);
 
 	RETURN_ZVAL(getThis(), 1, 0);
 }
@@ -323,10 +394,7 @@ PHP_METHOD(Batch, execute)
 	}
 
 	Connection *connection = T_fromObj(Connection, connection_ce, z_connection);
-	Executor *executor = Executor_new();
-	Executor_add(executor, connection, Batch_getThis());
-	Executor_execute(executor, timeout);
-	Executor_free(executor);
+	Connection_execute_simple(connection, Batch_getThis(), timeout);
 }
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_batch_next_rely, 0, 0, 3)

@@ -10,7 +10,7 @@ It should be easy to build higher level abstractions on top of Libredis
 (of which the included PHP extension is an example).
 
 Libredis provides a fast and efficient IO implementation for talking concurrently 
-with multiple Redis servers (using libevent based non-blocking IO). 
+with multiple Redis servers (using non-blocking asynchronous IO). 
 It uses a 'batch' abstraction in order to support pipeline-ing 
 (e.g. send more than 1 command to Redis in a single operation), and
 finally a consistent hashing implementation (Ketama) is provided for partitioning keys across servers.
@@ -22,21 +22,45 @@ format of the results does not change.
 
 As a convenience, The PHP extension does at least support formatting the get and set commands.
 
+Examples (in increasing order of complexity)
 
 -- Hello world (in PHP, using the included php extension) --
 
 $libredis = Libredis();
 $connection = $libredis->get_connection("127.0.0.1");
-//set a key
+//set a key:
+$connection->set('hello', 'world', 200); //set the key hello to 'world' with a timeout of 200ms
+//get a key:
+echo $connection->get('hello', 200); //get the value of key hello with a timeout of 200ms
+
+-- Multiple commands at the same time --
+
+//multi-set
 $batch = $libredis->create_batch();
 $batch->set('hello', 'world');
-$batch->execute($connection); 
-//now fetch the key
+$batch->set('hello2', 'world2';
+$batch->execute($connection, 200); //same as $connection->execute($batch, ...) 
+//multi-get
 $batch = $libredis->create_batch();
 $batch->get('hello');
-$batch->execute($connection);
+$batch->get('hello2');
+$connection->execute($batch, 200); same as $batch->execute($connection, ...)
 while($batch->next_reply($reply_type, $reply_value, $reply_length)) {
     echo $reply_value, PHP_EOL;    
+}
+
+-- Performing any command (incr in this example) --
+$connection = $libredis->get_connection("$ip:6379");
+$batch = $libredis->create_batch();
+$batch->write("INCR incr_test\r\n", 1);
+$connection->execute($batch);
+while($level = $batch->next_reply($reply_type, $reply_value, $reply_length)) {
+    echo "start", PHP_EOL;
+    echo "\ttype ", $reply_type, PHP_EOL;
+    echo "\tval ", $reply_value, " (", gettype($reply_value), ")", PHP_EOL;
+    echo "\tlen ", $reply_length, PHP_EOL;
+    echo "\tlevel ", $level, PHP_EOL;
+    echo "end", PHP_EOL;
 }
 
 -- Talking to multiple servers in parallel --

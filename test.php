@@ -199,6 +199,13 @@ function test_convenience()
 {
     global $libredis;
     global $ip;
+    
+    assert(false);
+    
+    $connection = $libredis->get_connection("$ip:6379");
+    $connection->set("piet", "test12345");
+    $connection->get("piet");
+
     $batch = $libredis->create_batch();
     $batch->set("blaat", "aap");
     $batch->set("joop", "blaat");
@@ -219,9 +226,9 @@ function test_convenience()
 //test_ketama();
 //test_simple();
 //test_leak();
-test_mget();
+//test_mget();
 //test_destroy();
-//test_integer_reply();
+test_integer_reply();
 //test_connections();
 //test_convenience();
 //echo "done...!", PHP_EOL;
