@@ -183,6 +183,9 @@ void _Batch_free(Batch *batch, int final)
 #ifndef NDEBUG
 		Buffer_fill(batch->read_buffer, (Byte)0xEA);
 		Buffer_fill(batch->write_buffer, (Byte)0xEA);
+#else
+		Buffer_fill(batch->read_buffer, 0);
+		Buffer_fill(batch->write_buffer, 0);
 #endif
 	}
 	batch->has_error = 0;

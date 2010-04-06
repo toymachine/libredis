@@ -5,10 +5,9 @@
 ? signal interrupt errors?
 
 php:    
+    - connection->get, connection->set (creates batch, and executes, returns simple value)
     - batch->simple_reply()
     - use static redis lib for php extension
-    - Call-time pass-by-reference 
-            Apr  2 16:38:40 src@web714 nginx: 2010/04/02 16:38:40 [error] 29536#0: *92778127 FastCGI sent in stderr: "PHP Warning:  Call-time pass-by-reference has been deprecated in /var/www/hyves/CLASSES/UTIL/Application/HyvesApplication.php on line 15
     - read/write timeout error
     
     

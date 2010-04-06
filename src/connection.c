@@ -45,6 +45,7 @@ typedef enum _EventType
 	EVENT_READ = 1,
 	EVENT_WRITE = 2,
 	EVENT_TIMEOUT = 4,
+	EVENT_ERROR = 8,
 } EventType;
 
 struct _Connection
@@ -360,6 +361,11 @@ void Connection_handle_event(Connection *connection, EventType event)
 	DEBUG(("con event, fd: %d, state: %d, event: %d, readable: %d, writeable: %d, timeout: %d\n", connection->sockfd,
 			connection->state, event, (event & EVENT_READ) ? 1 : 0, (event & EVENT_WRITE) ? 1 : 0, (event & EVENT_TIMEOUT) ? 1 : 0 ));
 
+	if(event & EVENT_ERROR) {
+		Connection_abort(connection, "event error");
+		return;
+	}
+
 	if(event & EVENT_TIMEOUT) {
 		if(CS_CONNECTING == connection->state) {
 			Connection_abort(connection, "connect timeout");
@@ -379,6 +385,8 @@ void Connection_handle_event(Connection *connection, EventType event)
 	}
 
 }
+
+/************************************ EXECUTOR ***************************************/
 
 #define MAX_PAIRS 1024
 
@@ -428,11 +436,10 @@ int Executor_add(Executor *executor, Connection *connection, Batch *batch)
 {
 	assert(executor != NULL);
 	assert(connection != NULL);
-	assert(connection->state != CS_ABORTED);
 	assert(batch != NULL);
 
 	if(executor->numpairs >= MAX_PAIRS) {
-		SETERROR(("executor is full"));
+		SETERROR(("Executor is full"));
 		return -1;
 	}
 	struct _Pair *pair = &executor->pairs[executor->numpairs];
@@ -445,9 +452,25 @@ int Executor_add(Executor *executor, Connection *connection, Batch *batch)
 
 #define TIMESPEC_TO_MS(tm) (((double)tm.tv_sec) * 1000.0) + (((double)tm.tv_nsec) / 1000000.0)
 
+int Executor_current_timeout(Executor *executor, struct timeval *tv)
+{
+	struct timespec tm;
+	clock_gettime(CLOCK_MONOTONIC, &tm);
+	double cur_tm_ms = TIMESPEC_TO_MS(tm);
+	DEBUG(("Executor cur_tm: %3.2f\n", cur_tm_ms));
+	double left_ms = executor->end_tm_ms - cur_tm_ms;
+	DEBUG(("Time left: %3.2f\n", left_ms));
+	tv->tv_sec = (time_t)left_ms / 1000.0;
+	tv->tv_usec = (left_ms - (tv->tv_sec * 1000.0)) * 1000.0;
+	DEBUG(("Timeout: %d sec, %d usec\n", (int)tv->tv_sec, (int)tv->tv_usec));
+	return 0;
+}
+
 int Executor_execute(Executor *executor, int timeout_ms)
 {
 	DEBUG(("Executor execute start\n"));
+
+	//determine max endtime based on timeout
 	struct timespec tm;
 	clock_gettime(CLOCK_MONOTONIC, &tm);
 	DEBUG(("Executor start_tm_ms: %3.2f\n", TIMESPEC_TO_MS(tm)));
@@ -460,19 +483,12 @@ int Executor_execute(Executor *executor, int timeout_ms)
 		Connection_execute_start(pair->connection, executor, pair->batch);
 	}
 
-	while(executor->numevents > 0) { //for as long there are outstanding events
+	int select_result = 1;
+	while(executor->numevents > 0 && select_result > 0) { //for as long there are outstanding events
 
 		//figure out how many ms left for this execution
-		struct timespec tm;
-		clock_gettime(CLOCK_MONOTONIC, &tm);
-		double cur_tm_ms = TIMESPEC_TO_MS(tm);
-		DEBUG(("Executor cur_tm: %3.2f\n", cur_tm_ms));
-		double left_ms = executor->end_tm_ms - cur_tm_ms;
-		DEBUG(("Time left: %3.2f\n", left_ms));
 		struct timeval tv;
-		tv.tv_sec = (time_t)left_ms / 1000.0;
-		tv.tv_usec = (left_ms - (tv.tv_sec * 1000.0)) * 1000.0;
-		DEBUG(("Timeout: %d sec, %d usec\n", (int)tv.tv_sec, (int)tv.tv_usec));
+		Executor_current_timeout(executor, &tv);
 
 		//copy filedes. sets, because select is going to modify them
 		fd_set readfds;
@@ -482,12 +498,17 @@ int Executor_execute(Executor *executor, int timeout_ms)
 
 		//do the select
 		DEBUG(("Executor start select max_fd %d, num_events: %d\n", executor->max_fd, executor->numevents));
-		int res = select(executor->max_fd + 1, &readfds, &writefds, NULL, &tv);
-		DEBUG(("Executor select res %d\n", res));
+		select_result = select(executor->max_fd + 1, &readfds, &writefds, NULL, &tv);
+		//TODO set global error msg to errno
+
+		DEBUG(("Executor select res %d\n", select_result));
 
 		for(int i = 0; i < executor->numpairs; i++) {
+
 			struct _Pair *pair = &executor->pairs[i];
 			Connection *connection = pair->connection;
+			Batch *batch = pair->batch;
+
 			EventType event = 0;
 			if(FD_ISSET(connection->sockfd, &readfds)) {
 				event |= EVENT_READ;
@@ -499,14 +520,23 @@ int Executor_execute(Executor *executor, int timeout_ms)
 				FD_CLR(connection->sockfd, &executor->writefds);
 				executor->numevents -= 1;
 			}
-			if(event > 0) {
+
+			if(select_result == 0) {
+				event = EVENT_TIMEOUT;
+			}
+			else if(select_result < 0) {
+				event = EVENT_ERROR;
+			}
+
+			if(event > 0 && Batch_has_command(batch)) {
+				//there is an event, and batch is not finished
 				Connection_handle_event(connection, event);
 			}
 		}
 	}
 
 	DEBUG(("Executor execute done\n"));
-	return 0;
+	return select_result;
 }
 
 void Executor_notify_event(Executor *executor, Connection *connection, EventType event)

@@ -39,15 +39,15 @@ Buffer *Buffer_new(size_t size)
 	buffer->limit = buffer->capacity;
 #ifndef NDEBUG
 	Buffer_fill(buffer, (Byte)0xEA);
+#else
+	Buffer_fill(buffer, 0);
 #endif
 	return buffer;
 }
 
 void Buffer_fill(Buffer *buffer, Byte b)
 {
-	for(int i = 0; i < buffer->capacity; i++) {
-		buffer->buff[i] = b;
-	}
+	memset(buffer->buff, b, buffer->capacity);
 }
 
 void Buffer_clear(Buffer *buffer)
