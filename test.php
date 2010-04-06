@@ -200,7 +200,7 @@ function test_convenience()
     global $libredis;
     global $ip;
     
-    assert(false);
+    //assert(false);
     
     $connection = $libredis->get_connection("$ip:6379");
     $connection->set("piet", "test12345");

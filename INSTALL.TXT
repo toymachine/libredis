@@ -1,14 +1,14 @@
-You need the libevent and php development headers to build libredis.
+== PHP EXTENSION ==
 
-Then, in this director:
+sudo make php_ext 
+
+(sudo is needed because it will try and install in php extension dir.)
+
+== C Library ==
 
 make libredis
 
-if that goes ok
-
-sudo make php_ext
-
-this should build and install the php extension.
+(which will leave 'libredis.so' in the lib dir)
 
 enjoy.
 
