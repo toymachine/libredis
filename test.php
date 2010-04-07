@@ -228,7 +228,7 @@ test_mget();
 //test_destroy();
 //test_integer_reply();
 //test_connections();
-//test_convenience();
+test_convenience();
 //echo "done...!", PHP_EOL;
 
 ?>

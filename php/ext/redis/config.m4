@@ -43,21 +43,25 @@ if test "$PHP_REDIS" != "no"; then
   PHP_ADD_INCLUDE($REDIS_DIR/include)
 
   dnl # --with-redis -> check for lib and symbol presence
-  LIBNAME=redis # you may want to change this
-  LIBSYMBOL=Module_init # you most likely want to change this 
+  dnl # LIBNAME=redis # you may want to change this
+  dnl # LIBSYMBOL=Module_init # you most likely want to change this 
 
-  PHP_CHECK_LIBRARY($LIBNAME,$LIBSYMBOL,
-  [
-     PHP_ADD_LIBRARY_WITH_PATH($LIBNAME, $REDIS_DIR/lib, REDIS_SHARED_LIBADD)
-     AC_DEFINE(HAVE_REDISLIB,1,[ ])
-   ],[
-     AC_MSG_ERROR([wrong redis lib version or lib not found])
-   ],[
-     -L$REDIS_DIR/lib -lm -ldl
-   ])
+  dnl # PHP_CHECK_LIBRARY($LIBNAME,$LIBSYMBOL,
+  dnl #[
+  dnl #   PHP_ADD_LIBRARY_WITH_PATH($LIBNAME, $REDIS_DIR/lib, REDIS_SHARED_LIBADD)
+  dnl #   AC_DEFINE(HAVE_REDISLIB,1,[ ])
+  dnl # ],[
+  dnl #   AC_MSG_ERROR([wrong redis lib version or lib not found])
+  dnl # ],[
+  dnl #   -L$REDIS_DIR/lib -lm -ldl
+  dnl # ])
   
   PHP_SUBST(REDIS_SHARED_LIBADD)
 
-  PHP_NEW_EXTENSION(redis, php_redis.c, $ext_shared)
+  CFLAGS="-std=gnu99 $CFLAGS -pedantic -Wall -DNDEBUG"
+
+  PHP_ADD_LIBRARY(rt,, REDIS_SHARED_LIBADD)
+
+  PHP_NEW_EXTENSION(redis, php_redis.c alloc.c batch.c connection.c ketama.c md5.c module.c parser.c buffer.c, $ext_shared)
 fi
--
+
