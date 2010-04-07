@@ -6,41 +6,81 @@
 *
 */
 
+#include <assert.h>
+#include <stdio.h>
+#include <stdarg.h>
+
 #include "module.h"
 #include "reply.h"
 #include "batch.h"
 
-Module *g_module;
-Module g_default_module;
+Module g_module;
 
-void Module_init(Module *module)
+Module *Module_new()
 {
-	if(module == NULL) {
-		g_module = &g_default_module;
-	}
-	else {
-		g_module = module;
-	}
-	DEBUG(("Module init\n"));
-	if(g_module->alloc_malloc == NULL) {
-		g_module->alloc_malloc = malloc;
-	}
-	if(g_module->alloc_realloc == NULL) {
-		g_module->alloc_realloc = realloc;
-	}
-	if(g_module->alloc_free == NULL) {
-		g_module->alloc_free = free;
-	}
-	DEBUG(("start alloc: %d\n", g_module->allocated));
+	return &g_module;
 }
 
-void Module_free()
+int Module_init(Module *module)
 {
+	assert(module == &g_module);//for now...
+
+	DEBUG(("Module init\n"));
+	if(module->alloc_malloc == NULL) {
+		module->alloc_malloc = malloc;
+	}
+	if(module->alloc_realloc == NULL) {
+		module->alloc_realloc = realloc;
+	}
+	if(module->alloc_free == NULL) {
+		module->alloc_free = free;
+	}
+	DEBUG(("start alloc: %d\n", module->allocated));
+	return 0;
+}
+
+void Module_set_alloc_alloc(Module *module, void * (*alloc_malloc)())
+{
+	module->alloc_malloc = alloc_malloc;
+}
+
+void Module_set_alloc_realloc(Module *module, void * (*alloc_realloc)(void *, size_t))
+{
+	module->alloc_realloc = alloc_realloc;
+}
+
+void Module_set_alloc_free(Module *module, void (*alloc_free)(void *))
+{
+	module->alloc_free= alloc_free;
+}
+
+size_t Module_get_allocated(Module *module)
+{
+	return module->allocated;
+}
+
+char *Module_last_error(Module *module)
+{
+	return module->error;
+}
+
+void Module_set_error(Module *module, char *format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	vsnprintf(module->error, MAX_ERROR_SIZE, format, args);
+	va_end(args);
+}
+
+void Module_free(Module *module)
+{
+	assert(module == &g_module);//for now...
+
 	DEBUG(("Module free\n"));
 	//release the freelists
 	Reply_free_final();
 //	Command_free_final();
 	Batch_free_final();
 
-	DEBUG(("final alloc: %d\n", g_module->allocated));
+	DEBUG(("final alloc: %d\n", module->allocated));
 }

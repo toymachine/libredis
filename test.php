@@ -222,6 +222,21 @@ function test_convenience()
 
 }
 
+function test_error()
+{
+    global $libredis;
+    global $ip;
+
+    $connection = $libredis->get_connection("$ip:6379");
+    $batch = $libredis->create_batch();
+    $executor = $libredis->create_executor();
+
+    for($i = 0; $i < 10000; $i++) {
+        $res = $executor->add($connection, $batch);
+        print_r('x');
+    }
+}
+
 //test_ketama();
 test_simple();
 //test_leak();
@@ -230,6 +245,7 @@ test_simple();
 test_integer_reply();
 //test_connections();
 test_convenience();
-//echo "done...!", PHP_EOL;
+test_error();
+echo "done...!", PHP_EOL;
 
 ?>

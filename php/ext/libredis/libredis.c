@@ -37,7 +37,7 @@ zend_class_entry *executor_ce;
 ZEND_DECLARE_MODULE_GLOBALS(libredis)
 */
 
-Module g_module;
+Module *g_module;
 HashTable g_connections; //persistent connections
 HashTable g_batch; //for keeping track of batch instances
 HashTable g_ketama; //for keeping track of ketama instances
@@ -139,7 +139,10 @@ PHP_METHOD(Executor, add)
 	Connection *connection = T_fromObj(Connection, connection_ce, z_connection);
 	Batch *batch = T_fromObj(Batch, batch_ce, z_batch);
 
-	Executor_add(Executor_getThis(), connection, batch);
+	if(-1 == Executor_add(Executor_getThis(), connection, batch)) {
+	   zend_error(E_ERROR, "%s", Module_last_error(g_module));
+	   RETURN_NULL();
+	}
 }
 
 PHP_METHOD(Executor, execute)
@@ -342,17 +345,17 @@ PHP_METHOD(Batch, next_reply)
 
 	if (!PZVAL_IS_REF(reply_type))
 	{
-	   zend_error(E_WARNING, "Parameter wasn't passed by reference (reply_type)");
+	   zend_error(E_ERROR, "Parameter wasn't passed by reference (reply_type)");
 	   RETURN_NULL();
 	}
 	if (!PZVAL_IS_REF(reply_value))
 	{
-	    zend_error(E_WARNING, "Parameter wasn't passed by reference (reply_value)");
+	    zend_error(E_ERROR, "Parameter wasn't passed by reference (reply_value)");
 	    RETURN_NULL();
 	}
 	if (!PZVAL_IS_REF(reply_length))
 	{
-	    zend_error(E_WARNING, "Parameter wasn't passed by reference (reply_length)");
+	    zend_error(E_ERROR, "Parameter wasn't passed by reference (reply_length)");
 	    RETURN_NULL();
 	}
 
@@ -458,7 +461,7 @@ PHP_METHOD(Redis, get_connection)
 		//syslog(LOG_DEBUG, "connection not found: %s", addr);
 		connection = Connection_new(addr);
 		if(connection == NULL) {
-			 zend_error(E_ERROR, "%s", g_module.error);
+			 zend_error(E_ERROR, "%s", Module_last_error(g_module));
 		}
 		//syslog(LOG_DEBUG, "connection created addr: %p", connection);
 		zend_hash_update(&g_connections, addr, addr_len, &connection, sizeof(connection), &pDest);
@@ -539,11 +542,11 @@ PHP_MINIT_FUNCTION(libredis)
     zend_hash_init(&g_ketama, 32, NULL, NULL, 1);
     zend_hash_init(&g_executor, 16, NULL, NULL, 1);
 
-    g_module.size = sizeof(Module);
-    g_module.alloc_malloc = __zend_malloc;
-    g_module.alloc_realloc = __zend_realloc;
-    g_module.alloc_free = free;
-    Module_init(&g_module);
+    g_module = Module_new();
+    Module_set_alloc_alloc(g_module, __zend_malloc);
+    Module_set_alloc_realloc(g_module, __zend_realloc);
+    Module_set_alloc_free(g_module, free);
+    Module_init(g_module);
 
     openlog("libredis", 0, LOG_LOCAL2);
     syslog(LOG_DEBUG, "libredis module init");
@@ -582,10 +585,10 @@ PHP_MSHUTDOWN_FUNCTION(libredis)
 	//todo check if the above really release all resource, what about the items in the hashtable?, are they released
 	//hash destroy?
 
-	Module_free();
+	Module_free(g_module);
 
 	openlog("libredis", 0, LOG_LOCAL2);
-	syslog(LOG_DEBUG, "libredis module shutdown complete, final alloc: %d\n", g_module.allocated);
+	syslog(LOG_DEBUG, "libredis module shutdown complete, final alloc: %d\n", Module_get_allocated(g_module));
 
 	return SUCCESS;
 }
@@ -613,7 +616,7 @@ PHP_RSHUTDOWN_FUNCTION(libredis)
 	zend_hash_apply(&g_executor, shutdown_hash_free_Executor); //frees any executor still left, e.g. not freed by normal dispose
 
 	openlog("libredis", 0, LOG_LOCAL2);
-	syslog(LOG_DEBUG, "libredis request shutdown complete, final alloc: %d, g_batchsz: %d\n", g_module.allocated, g_batch.nNumOfElements);
+	syslog(LOG_DEBUG, "libredis request shutdown complete, final alloc: %d, g_batchsz: %d\n", Module_get_allocated(g_module), g_batch.nNumOfElements);
 
 	return SUCCESS;
 }

@@ -72,7 +72,7 @@ Connection *Connection_new(const char *in_addr)
 	DEBUG(("alloc Connection\n"));
 	Connection *connection = Alloc_alloc_T(Connection);
 	if(connection == NULL) {
-		SETERROR(("Out of memory while allocating Connection"));
+		Module_set_error(GET_MODULE(), "Out of memory while allocating Connection");
 		return NULL;
 	}
 	connection->state = CS_CLOSED;
@@ -86,7 +86,7 @@ Connection *Connection_new(const char *in_addr)
 
 	//copy socket addr
 	if(ADDR_SIZE < snprintf(connection->addr, ADDR_SIZE, "%s", in_addr)) {
-		SETERROR(("Invalid address for Connection"));
+		Module_set_error(GET_MODULE(), "Invalid address for Connection");
 		Connection_free(connection);
 		return NULL;
 	}
@@ -107,7 +107,7 @@ Connection *Connection_new(const char *in_addr)
 	connection->sa.sin_family = AF_INET;
 	connection->sa.sin_port = htons(port);
 	if(!inet_pton(AF_INET, addr, &connection->sa.sin_addr)) {
-		SETERROR(("Could not parse ip address"));
+		Module_set_error(GET_MODULE(), "Could not parse ip address");
 		Connection_free(connection);
 		return NULL;
 	}
@@ -412,7 +412,7 @@ Executor *Executor_new()
 	DEBUG(("alloc Executor\n"));
 	Executor *executor = Alloc_alloc_T(Executor);
 	if(executor == NULL) {
-		SETERROR(("Out of memory while allocating Executor"));
+		Module_set_error(GET_MODULE(), "Out of memory while allocating Executor");
 		return NULL;
 	}
 	executor->numpairs = 0;
@@ -439,7 +439,7 @@ int Executor_add(Executor *executor, Connection *connection, Batch *batch)
 	assert(batch != NULL);
 
 	if(executor->numpairs >= MAX_PAIRS) {
-		SETERROR(("Executor is full"));
+		Module_set_error(GET_MODULE(), "Executor is full, max = %d", MAX_PAIRS);
 		return -1;
 	}
 	struct _Pair *pair = &executor->pairs[executor->numpairs];

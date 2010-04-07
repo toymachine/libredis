@@ -16,24 +16,24 @@
 
 static inline void *_Alloc_alloc(size_t size)
 {
-	g_module->allocated += size;
-	DEBUG(("alloc real: %d total now: %d\n", size, g_module->allocated));
-	return g_module->alloc_malloc(size);
+	GET_MODULE()->allocated += size;
+	DEBUG(("alloc real: %d total now: %d\n", size, GET_MODULE()->allocated));
+	return GET_MODULE()->alloc_malloc(size);
 }
 
 static inline void _Alloc_free(void *obj, size_t size)
 {
-	g_module->alloc_free(obj);
-	g_module->allocated -= size;
-	DEBUG(("dealloc real: %d total now: %d\n", size, g_module->allocated));
+	GET_MODULE()->alloc_free(obj);
+	GET_MODULE()->allocated -= size;
+	DEBUG(("dealloc real: %d total now: %d\n", size, GET_MODULE()->allocated));
 }
 
 static inline void *_Alloc_realloc(void *obj, size_t new_size, size_t old_size)
 {
-	g_module->allocated -= old_size;
-	g_module->allocated += new_size;
-	DEBUG(("realloc real: %d total now: %d\n", new_size, g_module->allocated));
-	return g_module->alloc_realloc(obj, new_size);
+	GET_MODULE()->allocated -= old_size;
+	GET_MODULE()->allocated += new_size;
+	DEBUG(("realloc real: %d total now: %d\n", new_size, GET_MODULE()->allocated));
+	return GET_MODULE()->alloc_realloc(obj, new_size);
 }
 
 #define Alloc_alloc_T(T) (T *) _Alloc_alloc(sizeof(T))

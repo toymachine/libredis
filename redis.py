@@ -10,8 +10,11 @@ elif '--release' in sys.argv:
 else:
     libredis = cdll.LoadLibrary("lib/libredis.so")
 
-libredis.Module_init(0)
-atexit.register(libredis.Module_free)
+g_module = libredis.Module_new()
+libredis.Module_init(g_module)
+def g_Module_free():
+    libredis.Module_free(g_module)
+atexit.register(g_Module_free)
 
 DEFAULT_TIMEOUT_MS = 3000
 

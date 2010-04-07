@@ -10,6 +10,21 @@
 
 #include "redis.h"
 
-extern Module *g_module;
+#define MAX_ERROR_SIZE 255
+
+struct _Module
+{
+	size_t size; //size of module structure
+	void * (*alloc_malloc)(size_t size);
+    void * (*alloc_realloc)(void *ptr, size_t size);
+    void (*alloc_free)(void *ptr);
+    size_t allocated;
+    char error[MAX_ERROR_SIZE];
+};
+
+extern Module g_module;
+#define GET_MODULE() ((Module *)&g_module)
+
+void Module_set_error(Module *module, char *format, ...);
 
 #endif /* MODULE_H_ */

@@ -45,7 +45,7 @@ ReplyParser *ReplyParser_new()
 	DEBUG(("alloc ReplyParser\n"));
 	ReplyParser *rp = Alloc_alloc_T(ReplyParser);
 	if(rp == NULL) {
-		SETERROR(("Out of memory while allocating ReplyParser"));
+		Module_set_error(GET_MODULE(), "Out of memory while allocating ReplyParser");
 		return NULL;
 	}
 	ReplyParser_reset(rp);

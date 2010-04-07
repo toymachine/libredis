@@ -3,25 +3,21 @@
 
 #include <string.h>
 
-#define MAX_ERROR_SIZE 255
-
-typedef struct _Module
-{
-	size_t size; //size of module structure
-	void * (*alloc_malloc)(size_t size);
-    void * (*alloc_realloc)(void *ptr, size_t size);
-    void (*alloc_free)(void *ptr);
-    size_t allocated;
-    char error[MAX_ERROR_SIZE];
-} Module;
-
-void Module_init(Module *module);
-void Module_free();
-
+typedef struct _Module Module;
 typedef struct _Batch Batch;
 typedef struct _Connection Connection;
 typedef struct _Ketama Ketama;
 typedef struct _Executor Executor;
+
+
+Module *Module_new();
+int Module_init(Module *module);
+void Module_set_alloc_alloc(Module *module, void * (*alloc_malloc)());
+void Module_set_alloc_realloc(Module *module, void * (*alloc_realloc)(void *, size_t));
+void Module_set_alloc_free(Module *module, void (*alloc_free)(void *));
+size_t Module_get_allocated(Module *module);
+char *Module_last_error(Module *module);
+void Module_free(Module *module);
 
 typedef enum _ReplyType
 {
