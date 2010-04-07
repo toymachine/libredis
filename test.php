@@ -219,14 +219,15 @@ function test_convenience()
     while($batch->next_reply($reply_type, $reply_value, $reply_length)) {
         echo $reply_value, PHP_EOL;    
     }
+
 }
 
 //test_ketama();
-//test_simple();
+test_simple();
 //test_leak();
-test_mget();
+//test_mget();
 //test_destroy();
-//test_integer_reply();
+test_integer_reply();
 //test_connections();
 test_convenience();
 //echo "done...!", PHP_EOL;

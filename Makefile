@@ -9,11 +9,11 @@ libredis: src/alloc.o src/batch.o src/connection.o src/ketama.o src/md5.o src/mo
 
 php_ext:
 	rm -rf $(PHP_EXT_BUILD)
-	cp -a php/ext/redis $(PHP_EXT_BUILD)
+	cp -a php/ext/libredis $(PHP_EXT_BUILD)
 	cp src/*.c $(PHP_EXT_BUILD)
 	cp src/*.h $(PHP_EXT_BUILD)
 	cd $(PHP_EXT_BUILD); phpize
-	cd $(PHP_EXT_BUILD); ./configure --with-redis=$(REDIS_HOME)
+	cd $(PHP_EXT_BUILD); ./configure --with-libredis=$(REDIS_HOME)
 	cd $(PHP_EXT_BUILD); sudo make install
 
 clean:
