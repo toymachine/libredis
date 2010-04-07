@@ -231,12 +231,37 @@ function test_error()
     $batch = $libredis->create_batch();
     $executor = $libredis->create_executor();
 
-    for($i = 0; $i < 10000; $i++) {
-        $res = $executor->add($connection, $batch);
-        print_r('x');
+    for($i = 0; $i < 2000; $i++) {
+        $executor->add($connection, $batch);
     }
 }
 
+function test_timeout()
+{
+    global $libredis;
+    global $ip;
+
+    while(true) {
+        $connection = $libredis->get_connection("$ip:6390");
+        if(false === $connection->set("blaat", "aap", 100)) {
+            echo "could not set value, error was: '", $libredis->last_error(), "'", PHP_EOL;           
+        }
+        
+        if(false === $connection->get("blaat", 100)) {
+            echo "could not get value, error was: '", $libredis->last_error(), "'", PHP_EOL;
+        }
+        
+        $executor = $libredis->create_executor();
+        $batch = $libredis->create_batch();
+        $batch->get('blaat');
+        $executor->add($connection, $batch);
+        
+        if(false === $executor->execute(1000)) {
+            echo "could not execute value, error was: '", $libredis->last_error(), "'", PHP_EOL;
+        }
+    }
+}
+    
 //test_ketama();
 //test_simple();
 //test_leak();
@@ -244,8 +269,9 @@ function test_error()
 //test_destroy();
 //test_integer_reply();
 //test_connections();
-test_convenience();
+//test_convenience();
 //test_error();
+test_timeout();
 echo "done...!", PHP_EOL;
 
 ?>

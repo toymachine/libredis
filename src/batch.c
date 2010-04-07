@@ -10,6 +10,7 @@
 #include <assert.h>
 
 #include "common.h"
+#include "alloc.h"
 #include "batch.h"
 #include "list.h"
 #include "reply.h"

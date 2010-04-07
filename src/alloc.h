@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "common.h"
 #include "module.h"
 
 static inline void *_Alloc_alloc(size_t size)

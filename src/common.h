@@ -33,7 +33,7 @@
 
 typedef char Byte;
 
-#include "alloc.h"
+//#include "alloc.h"
 
 typedef struct _Command Command;
 typedef struct _Reply Reply;

@@ -15,6 +15,7 @@
 #include <assert.h>
 
 #include "common.h"
+#include "alloc.h"
 #include "buffer.h"
 #include "list.h"
 

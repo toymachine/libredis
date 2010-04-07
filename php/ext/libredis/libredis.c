@@ -20,7 +20,7 @@
 
 #include "redis.h"
 
-#define DEFAULT_TIMEOUT_MS 3000
+#define DEFAULT_TIMEOUT_MS 5000
 
 #define T_fromObj(T, ce, obj) (T *)Z_LVAL_P(zend_read_property(ce, obj, "handle", 6, 0))
 #define T_getThis(T, ce) (T *)Z_LVAL_P(zend_read_property(ce, getThis(), "handle", 6, 0))
@@ -37,7 +37,11 @@ zend_class_entry *executor_ce;
 ZEND_DECLARE_MODULE_GLOBALS(libredis)
 */
 
+#define MAX_ERROR_SIZE 255
+
 Module *g_module;
+char g_module_error[MAX_ERROR_SIZE];
+
 HashTable g_connections; //persistent connections
 HashTable g_batch; //for keeping track of batch instances
 HashTable g_ketama; //for keeping track of ketama instances
@@ -47,6 +51,8 @@ HashTable g_executor; //for keeping track of executor instances
 int Connection_execute_simple(Connection *connection, Batch *batch, long timeout);
 void Batch_write_set(Batch *batch, char *key, int key_len, char *value, int value_len);
 void Batch_write_get(Batch *batch, char *key, int key_len);
+void set_last_error_from_global_error();
+void set_last_error_from_batch_error(Batch *batch);
 
 /**************** KETAMA ***********************/
 
@@ -143,6 +149,8 @@ PHP_METHOD(Executor, add)
 	   zend_error(E_ERROR, "%s", Module_last_error(g_module));
 	   RETURN_NULL();
 	}
+
+	RETURN_BOOL(1);
 }
 
 PHP_METHOD(Executor, execute)
@@ -154,8 +162,12 @@ PHP_METHOD(Executor, execute)
 	}
 
 	int execute_res = Executor_execute(Executor_getThis(), timeout);
-	if(execute_res >= 0) {
-		RETURN_BOOL(execute_res);
+	if(execute_res > 0) {
+		RETURN_BOOL(1);
+	}
+	else if(execute_res == 0) {
+		set_last_error_from_global_error();
+		RETURN_BOOL(0);
 	}
 	else {
 		zend_error(E_ERROR, "%s", Module_last_error(g_module));
@@ -221,8 +233,34 @@ PHP_METHOD(Connection, set)
 
 	Batch *batch = Batch_new();
 	Batch_write_set(batch, key, key_len, value, value_len);
-	Connection_execute_simple(Connection_getThis(), batch, timeout);
-	//TODO check execute result AND reply result
+	if(Connection_execute_simple(Connection_getThis(), batch, timeout)) {
+		ReplyType c_reply_type;
+		char *c_reply_value;
+		size_t c_reply_length;
+		int level = Batch_next_reply(batch, &c_reply_type, &c_reply_value, &c_reply_length);
+		if(level != 1) {
+			zend_error(E_ERROR, "Unexpected level");
+			RETVAL_NULL();
+		}
+		else {
+			if(c_reply_type == RT_OK) {
+				RETVAL_BOOL(1);
+			}
+			else if(c_reply_type == RT_ERROR) {
+				set_last_error_from_batch_error(batch);
+				RETVAL_BOOL(0);
+			}
+			else {
+				zend_error(E_ERROR, "Unexpected reply type");
+				RETVAL_NULL();
+			}
+		}
+	}
+	else {
+		set_last_error_from_global_error();
+		RETVAL_BOOL(0);
+	}
+	Batch_free(batch);
 }
 
 PHP_METHOD(Connection, get)
@@ -238,31 +276,44 @@ PHP_METHOD(Connection, get)
 	Batch *batch = Batch_new();
 	Batch_write_get(batch, key, key_len);
 
-	//TODO check execute result
-	Connection_execute_simple(Connection_getThis(), batch, timeout);
+	if(Connection_execute_simple(Connection_getThis(), batch, timeout)) {
 
-	ReplyType c_reply_type;
-	char *c_reply_value;
-	size_t c_reply_length;
-	int level = Batch_next_reply(batch, &c_reply_type, &c_reply_value, &c_reply_length);
-	if(level != 1) {
-		zend_error(E_ERROR, "Unexpected level should not be here");
-	}
-
-    if(c_reply_type == RT_BULK) {
-		if(c_reply_value != NULL && c_reply_length > 0) {
-			RETURN_STRINGL(c_reply_value, c_reply_length, 1);
+		ReplyType c_reply_type;
+		char *c_reply_value;
+		size_t c_reply_length;
+		int level = Batch_next_reply(batch, &c_reply_type, &c_reply_value, &c_reply_length);
+		if(level != 1) {
+			zend_error(E_ERROR, "Unexpected level");
+			RETVAL_NULL();
 		}
 		else {
-			RETURN_EMPTY_STRING();
+			if(c_reply_type == RT_BULK) {
+				if(c_reply_value != NULL && c_reply_length > 0) {
+					RETVAL_STRINGL(c_reply_value, c_reply_length, 1);
+				}
+				else {
+					RETVAL_EMPTY_STRING();
+				}
+			}
+			else if(c_reply_type == RT_BULK_NIL) {
+				RETVAL_NULL();
+			}
+			else if(c_reply_type == RT_ERROR) {
+				set_last_error_from_batch_error(batch);
+				RETVAL_BOOL(0);
+			}
+			else {
+				zend_error(E_ERROR, "Unexpected reply type");
+				RETVAL_NULL();
+			}
 		}
-    }
-    else if(c_reply_type == RT_BULK_NIL) {
-    	RETURN_NULL();
-    }
-    else {
-    	RETURN_BOOL(0);
-    }
+	}
+	else {
+		set_last_error_from_global_error();
+		RETVAL_BOOL(0);
+	}
+
+    Batch_free(batch);
 }
 
 
@@ -441,6 +492,22 @@ function_entry batch_methods[] = {
 
 /***************** PHP MODULE **************************/
 
+void set_last_error_from_global_error()
+{
+	strncpy(g_module_error, Module_last_error(g_module), MAX_ERROR_SIZE);
+}
+
+void set_last_error_from_batch_error(Batch *batch)
+{
+	char *batch_error = Batch_error(batch);
+	if(batch_error != NULL) {
+		strncpy(g_module_error, batch_error, MAX_ERROR_SIZE);
+	}
+	else {
+		g_module_error[0] = '\0';
+	}
+}
+
 PHP_FUNCTION(Libredis)
 {
 	object_init_ex(return_value, redis_ce);
@@ -464,6 +531,12 @@ PHP_METHOD(Redis, create_executor)
 	zend_hash_update(&g_executor, (char *)&executor, sizeof(executor), &executor, sizeof(executor), &pDest);
 }
 
+PHP_METHOD(Redis, last_error)
+{
+	RETVAL_STRING(g_module_error, 1);
+	g_module_error[0] = '\0';
+}
+
 PHP_METHOD(Redis, get_connection)
 {
 	char *addr;
@@ -479,6 +552,7 @@ PHP_METHOD(Redis, get_connection)
 		connection = Connection_new(addr);
 		if(connection == NULL) {
 			 zend_error(E_ERROR, "%s", Module_last_error(g_module));
+			 RETURN_NULL();
 		}
 		else {
 			zend_hash_update(&g_connections, addr, addr_len, &connection, sizeof(connection), &pDest);
@@ -519,6 +593,7 @@ function_entry redis_methods[] = {
     PHP_ME(Redis,  create_executor,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Redis,  create_batch,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Redis,  get_connection,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Redis,  last_error,           NULL, ZEND_ACC_PUBLIC)
     {NULL, NULL, NULL}
 };
 

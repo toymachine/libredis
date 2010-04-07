@@ -37,6 +37,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "alloc.h"
 #include "list.h"
 
 #define INIT_MAX_SERVERS 1

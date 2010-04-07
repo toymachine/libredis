@@ -13,6 +13,7 @@
 #include <stdlib.h>
 
 #include "common.h"
+#include "alloc.h"
 #include "parser.h"
 
 #define MARK rp->mark = rp->p

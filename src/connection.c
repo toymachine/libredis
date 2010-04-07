@@ -23,6 +23,7 @@
 
 #include "redis.h"
 #include "common.h"
+#include "alloc.h"
 #include "buffer.h"
 #include "connection.h"
 #include "reply.h"

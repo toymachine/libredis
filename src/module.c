@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#include "alloc.h"
 #include "module.h"
 #include "reply.h"
 #include "batch.h"
