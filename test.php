@@ -113,8 +113,8 @@ function test_mget()
     for($i = 0; $i < $M; $i++) {
         $key = "piet$i";
         $value = "blaat$i";
-        $connection1->execute($libredis->create_batch()->set($key, $value));
-        $connection2->execute($libredis->create_batch()->set($key, $value));
+        $connection1->set($key, $value);
+        $connection2->set($key, $value);
         $keys[] = $key;
     }
     
@@ -200,8 +200,6 @@ function test_convenience()
     global $libredis;
     global $ip;
     
-    assert(false);
-    
     $connection = $libredis->get_connection("$ip:6379");
     $connection->set("piet", "test12345");
     $connection->get("piet");
@@ -213,7 +211,7 @@ function test_convenience()
     $connection->execute($batch);
     while($batch->next_reply($reply_type, $reply_value, $reply_length)) {
         echo $reply_value, PHP_EOL;    
-    }
+    }//
     $batch = $libredis->create_batch();
     $batch->get("blaat");
     $batch->get("joop");
@@ -226,9 +224,9 @@ function test_convenience()
 //test_ketama();
 //test_simple();
 //test_leak();
-//test_mget();
+test_mget();
 //test_destroy();
-test_integer_reply();
+//test_integer_reply();
 //test_connections();
 //test_convenience();
 //echo "done...!", PHP_EOL;
