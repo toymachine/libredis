@@ -24,8 +24,8 @@ struct _Buffer
 	Byte *buff; //the original buffer as allocated when buffer created
 	size_t buff_size; //original buffer size
 	size_t position;
-	int limit;
-	int capacity; //current capacity
+	size_t limit;
+	size_t capacity; //current capacity
 };
 
 Buffer *Buffer_new(size_t size)
@@ -62,12 +62,11 @@ void Buffer_clear(Buffer *buffer)
 	buffer->capacity = buffer->buff_size;
 }
 
-int Buffer_free(Buffer *buffer)
+void Buffer_free(Buffer *buffer)
 {
 	Alloc_free(buffer->buff, buffer->capacity);
 	DEBUG(("dealloc Buffer\n"));
 	Alloc_free_T(buffer, Buffer);
-	return 0;
 }
 
 
@@ -76,7 +75,7 @@ Byte *Buffer_data(Buffer *buffer)
 	return buffer->data;
 }
 
-int Buffer_dump(Buffer *buffer, int limit)
+void Buffer_dump(Buffer *buffer, size_t limit)
 {
 	int i, j;
 	if(limit == -1) {
@@ -98,10 +97,9 @@ int Buffer_dump(Buffer *buffer, int limit)
 		}
 		printf("\n");
 	}
-	return 0;
 }
 
-int Buffer_remaining(Buffer *buffer)
+size_t Buffer_remaining(Buffer *buffer)
 {
     return (buffer->limit - buffer->position);
 }
@@ -111,19 +109,17 @@ size_t Buffer_position(Buffer *buffer)
 	return buffer->position;
 }
 
-int Buffer_set_position(Buffer *buffer, size_t position)
+void Buffer_set_position(Buffer *buffer, size_t position)
 {
 	buffer->position = position;
-	return 0;
 }
 
-int Buffer_set_limit(Buffer *buffer, int limit)
+void Buffer_set_limit(Buffer *buffer, size_t limit)
 {
 	buffer->limit = limit;
-	return 0;
 }
 
-int Buffer_ensure_remaining(Buffer *buffer, int min_remaining)
+void Buffer_ensure_remaining(Buffer *buffer, int min_remaining)
 {
 	assert(buffer->limit == buffer->capacity);
 	while(Buffer_remaining(buffer) < min_remaining) {
@@ -143,7 +139,6 @@ int Buffer_ensure_remaining(Buffer *buffer, int min_remaining)
 		buffer->capacity = buffer->limit;
 	}
 	assert(buffer->limit == buffer->capacity);
-	return Buffer_remaining(buffer);
 }
 
 size_t Buffer_send(Buffer *buffer, int fd)
@@ -169,18 +164,16 @@ size_t Buffer_recv(Buffer *buffer, int fd)
 	return bytes_read;
 }
 
-int Buffer_flip(Buffer *buffer)
+void Buffer_flip(Buffer *buffer)
 {
 	buffer->limit = buffer->position;
 	buffer->position = 0;
-	return 0;
 }
 
-int Buffer_write(Buffer *buffer, const char *data, size_t len)
+void Buffer_write(Buffer *buffer, const char *data, size_t len)
 {
 	Buffer_ensure_remaining(buffer, len);
 	memcpy(buffer->data + buffer->position, data, len);
 	buffer->position += len;
-	return 0;
 }
 

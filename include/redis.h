@@ -37,6 +37,8 @@ void Connection_free(Connection *connection);
 Batch *Batch_new();
 void Batch_free(Batch *batch);
 void Batch_write(Batch *batch, const char *str, size_t str_len, int num_commands);
+void Batch_write_decimal(Batch *batch, long decimal);
+
 //reading out replies
 int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *len);
 char *Batch_error(Batch *batch);

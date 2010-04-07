@@ -536,6 +536,15 @@ int Executor_execute(Executor *executor, int timeout_ms)
 		}
 	}
 
+	if(select_result > 1) {
+		select_result = 1;
+	}
+	if(select_result < 0) {
+		Module_set_error(GET_MODULE(), "Execute select error, errno: [%d] %s", errno, strerror(errno));
+	}
+	else if(select_result == 0) {
+		Module_set_error(GET_MODULE(), "Execute timeout");
+	}
 	DEBUG(("Executor execute done\n"));
 	return select_result;
 }

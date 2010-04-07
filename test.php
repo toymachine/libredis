@@ -238,14 +238,14 @@ function test_error()
 }
 
 //test_ketama();
-test_simple();
+//test_simple();
 //test_leak();
 //test_mget();
 //test_destroy();
-test_integer_reply();
+//test_integer_reply();
 //test_connections();
 test_convenience();
-test_error();
+//test_error();
 echo "done...!", PHP_EOL;
 
 ?>

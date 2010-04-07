@@ -44,7 +44,7 @@ HashTable g_ketama; //for keeping track of ketama instances
 HashTable g_executor; //for keeping track of executor instances
 
 //some forward decls
-void Connection_execute_simple(Connection *connection, Batch *batch, long timeout);
+int Connection_execute_simple(Connection *connection, Batch *batch, long timeout);
 void Batch_write_set(Batch *batch, char *key, int key_len, char *value, int value_len);
 void Batch_write_get(Batch *batch, char *key, int key_len);
 
@@ -153,7 +153,14 @@ PHP_METHOD(Executor, execute)
 		RETURN_NULL();
 	}
 
-	Executor_execute(Executor_getThis(), timeout);
+	int execute_res = Executor_execute(Executor_getThis(), timeout);
+	if(execute_res >= 0) {
+		RETURN_BOOL(execute_res);
+	}
+	else {
+		zend_error(E_ERROR, "%s", Module_last_error(g_module));
+		RETURN_NULL();
+	}
 }
 
 function_entry executor_methods[] = {
@@ -169,12 +176,16 @@ function_entry executor_methods[] = {
 #define Connection_getThis() T_getThis(Connection, connection_ce)
 #define Connection_setThis(p) T_setThis(p, connection_ce)
 
-void Connection_execute_simple(Connection *connection, Batch *batch, long timeout)
+int Connection_execute_simple(Connection *connection, Batch *batch, long timeout)
 {
 	Executor *executor = Executor_new();
 	Executor_add(executor, connection, batch);
-	Executor_execute(executor, timeout);
+	int execute_result = Executor_execute(executor, timeout);
 	Executor_free(executor);
+	if(execute_result < 0) {
+		zend_error(E_ERROR, "%s", Module_last_error(g_module));
+	}
+	return execute_result;
 }
 
 PHP_METHOD(Connection, __destruct)
@@ -193,7 +204,7 @@ PHP_METHOD(Connection, execute)
 	}
 
 	Batch *batch = T_fromObj(Batch, batch_ce, z_batch);
-	Connection_execute_simple(Connection_getThis(), batch, timeout);
+	RETURN_BOOL(Connection_execute_simple(Connection_getThis(), batch, timeout));
 }
 
 PHP_METHOD(Connection, set)
@@ -211,6 +222,7 @@ PHP_METHOD(Connection, set)
 	Batch *batch = Batch_new();
 	Batch_write_set(batch, key, key_len, value, value_len);
 	Connection_execute_simple(Connection_getThis(), batch, timeout);
+	//TODO check execute result AND reply result
 }
 
 PHP_METHOD(Connection, get)
@@ -225,12 +237,17 @@ PHP_METHOD(Connection, get)
 
 	Batch *batch = Batch_new();
 	Batch_write_get(batch, key, key_len);
+
+	//TODO check execute result
 	Connection_execute_simple(Connection_getThis(), batch, timeout);
 
 	ReplyType c_reply_type;
 	char *c_reply_value;
 	size_t c_reply_length;
-	int res = Batch_next_reply(batch, &c_reply_type, &c_reply_value, &c_reply_length);
+	int level = Batch_next_reply(batch, &c_reply_type, &c_reply_value, &c_reply_length);
+	if(level != 1) {
+		zend_error(E_ERROR, "Unexpected level should not be here");
+	}
 
     if(c_reply_type == RT_BULK) {
 		if(c_reply_value != NULL && c_reply_length > 0) {
@@ -267,9 +284,9 @@ void Batch_write_set(Batch *batch, char *key, int key_len, char *value, int valu
 {
 	Batch_write(batch, "SET ", 4, 0);
 	Batch_write(batch, key, key_len, 0);
-	char buff[16];
-	int bufl = snprintf(buff, 16, " %d\r\n", value_len);
-	Batch_write(batch, buff, bufl, 0);
+	Batch_write(batch, " ", 1, 0);
+	Batch_write_decimal(batch, value_len);
+	Batch_write(batch, "\r\n", 2, 0);
 	Batch_write(batch, value, value_len, 0);
 	Batch_write(batch, "\r\n", 2, 1);
 }
@@ -402,7 +419,8 @@ PHP_METHOD(Batch, execute)
 	}
 
 	Connection *connection = T_fromObj(Connection, connection_ce, z_connection);
-	Connection_execute_simple(connection, Batch_getThis(), timeout);
+
+	RETURN_BOOL(Connection_execute_simple(connection, Batch_getThis(), timeout));
 }
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_batch_next_rely, 0, 0, 3)
@@ -458,17 +476,16 @@ PHP_METHOD(Redis, get_connection)
 	Connection *connection;
 	void *pDest;
 	if(FAILURE == zend_hash_find(&g_connections, addr, addr_len, &pDest)) {
-		//syslog(LOG_DEBUG, "connection not found: %s", addr);
 		connection = Connection_new(addr);
 		if(connection == NULL) {
 			 zend_error(E_ERROR, "%s", Module_last_error(g_module));
 		}
-		//syslog(LOG_DEBUG, "connection created addr: %p", connection);
-		zend_hash_update(&g_connections, addr, addr_len, &connection, sizeof(connection), &pDest);
+		else {
+			zend_hash_update(&g_connections, addr, addr_len, &connection, sizeof(connection), &pDest);
+		}
 	}
 	else {
 		connection = *((Connection **)pDest);
-		//syslog(LOG_DEBUG, "connection found: %s, %p", addr, connection);
 	}
 
 	object_init_ex(return_value, connection_ce);

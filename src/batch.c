@@ -75,10 +75,9 @@ void _Reply_free(Reply *reply, int final)
 	Reply_list_free(reply, final);
 }
 
-int Reply_add_child(Reply *reply, Reply *child)
+void Reply_add_child(Reply *reply, Reply *child)
 {
 	list_add_tail(&child->list, &reply->children);
-	return 0;
 }
 
 int Reply_has_child(Reply *reply)
@@ -107,7 +106,7 @@ ReplyType Reply_type(Reply *reply)
 	return reply->type;
 }
 
-int Reply_dump(Reply *reply) {
+void Reply_dump(Reply *reply) {
 	ReplyType reply_type = reply->type;
 	switch(reply_type) {
 	case RT_OK: {
@@ -143,7 +142,6 @@ int Reply_dump(Reply *reply) {
 	default:
 		printf("unknown reply %d\n", reply_type);
 	}
-	return 0;
 }
 
 ALLOC_LIST_T(Batch, list)
@@ -198,6 +196,13 @@ void Batch_write(Batch *batch, const char *str, size_t str_len, int num_commands
 		Buffer_write(batch->write_buffer, str, str_len);
 	}
 	batch->num_commands += num_commands;
+}
+
+void Batch_write_decimal(Batch *batch, long decimal)
+{
+	char buff[32];
+	int buff_len = snprintf(buff, 32, "%ld", decimal);
+	Batch_write(batch, buff, buff_len, 0);
 }
 
 int Batch_has_command(Batch *batch)

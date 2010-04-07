@@ -62,5 +62,5 @@ if test "$PHP_LIBREDIS" != "no"; then
 
   PHP_ADD_LIBRARY(rt,, LIBREDIS_SHARED_LIBADD)
 
-  PHP_NEW_EXTENSION(libredis, libredis.c alloc.c batch.c connection.c ketama.c md5.c module.c parser.c buffer.c, $ext_shared)
+  PHP_NEW_EXTENSION(libredis, libredis.c batch.c connection.c ketama.c md5.c module.c parser.c buffer.c, $ext_shared)
 fi
