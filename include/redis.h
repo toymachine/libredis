@@ -49,6 +49,10 @@
  * while(int level = Batch_next_reply(batch, &reply_type, &reply_data, &reply_len)) {
  * 		printf("reply type: %d, data: '%s', len: %d\n", (int)reply_type, reply_data, reply_len);
  * }
+ *
+ * If a function returns an error code (e.g. -1). You can call Module_last_error to get a textual description of the error.
+ *
+ * If a reply is an error reply (RT_ERROR type), the textual description will be in the reply_data.
  */
 #ifndef REDIS_H
 #define REDIS_H
@@ -62,16 +66,50 @@ typedef struct _Ketama Ketama;
 typedef struct _Executor Executor;
 
 
+/*
+ * Create a new instance of the library. (Currently this just returns the same global instance. This might change in the future)
+ */
 Module *Module_new();
+/**
+ * Overrid various memory-management functons to be used by libredis. You don't have to set these,
+ * libredis will use normal alloc/realloc/free in that case.
+ */
 void Module_set_alloc_alloc(Module *module, void * (*alloc_malloc)());
 void Module_set_alloc_realloc(Module *module, void * (*alloc_realloc)(void *, size_t));
 void Module_set_alloc_free(Module *module, void (*alloc_free)(void *));
+/**
+ * Initialise the libredis module once all properties have been set. The library is now ready to be used.
+ * Returns -1 if there is an error, 0 if all is ok.
+ */
 int Module_init(Module *module);
-
+/**
+ * Gets the amount of heap memory currently allocated by the libredis module. This should return 0 after the module has been freed.
+ */
 size_t Module_get_allocated(Module *module);
+/**
+ * Gets a textual description of the last error that occurred.
+ */
 char *Module_last_error(Module *module);
+/**
+ * Release all resources still held by libredis. The library cannot be used anymore after this call.
+ */
 void Module_free(Module *module);
 
+/**
+ * Create a new connection to a Redis instance. addr should be of form 'xxx.xxx.xxx.xxx:y' where xxx is an ip-address and y is the port
+ * to connect to. if the port is not given the default Redis port of 6379 will be used.
+ * Note that the actual connection will not be made at this point. It will open the connection as soon as the first command
+ * will be written to Redis.
+ */
+Connection *Connection_new(const char *addr);
+/**
+ * Release all resources held by the connection.
+ */
+void Connection_free(Connection *connection);
+
+/**
+ * Enumerates the type of replies that can be read from a Batch.
+ */
 typedef enum _ReplyType
 {
 	RT_ERROR = -1,
@@ -84,16 +122,29 @@ typedef enum _ReplyType
     RT_INTEGER = 6
 } ReplyType;
 
-Connection *Connection_new(const char *addr);
-void Connection_free(Connection *connection);
-
+/**
+ * Create a new Batch of redis commands
+ */
 Batch *Batch_new();
+/**
+ * Release all resources of the given batch
+ */
 void Batch_free(Batch *batch);
+/**
+ * Writes a command or part of a command into the batch. The batch will keep an internal pointer to the last written
+ * position, so that the next write will be appended from there. The batch will automatically grow in size.
+ * The num_commands argument specifies how many commands are added by this write. It might be 0 if you are writing a command in parts
+ * It is possible to call the write method without a string, just to set the number of commands in the batch.
+ * In that case pass NULL for str and 0 for str_len.
+ */
 void Batch_write(Batch *batch, const char *str, size_t str_len, int num_commands);
+/**
+ * Write a decimal into the batch (as a string, like using %d in a printf call).
+ */
 void Batch_write_decimal(Batch *batch, long decimal);
 
 //reading out replies
-int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *len);
+int (Batch *batch, ReplyType *reply_type, char **data, size_t *len);
 char *Batch_error(Batch *batch);
 
 Executor *Executor_new();
