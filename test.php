@@ -262,6 +262,33 @@ function test_timeout()
     }
 }
     
+function test_order()
+{
+    global $libredis;
+    global $ip;
+    
+    
+    $connection = $libredis->get_connection("$ip:6379");
+    $batch = $libredis->create_batch();
+    $executor = $libredis->create_executor();
+
+    $batch->write("SET foo 3\r\nbar\r\n", 1);
+    $batch->write("GET foo\r\n", 1);
+    $batch->write("MGET foo foo2\r\n", 1);
+    $batch->write("SET foo2 4\r\nbar2\r\n", 1);
+    $batch->write("GET foo2\r\n", 1);
+    $batch->write("MGET foo foo2\r\n", 1);
+    
+    $executor->add($connection, $batch);
+    
+    $executor->execute(500);
+
+    while($level = $batch->next_reply($reply_type, $reply_value, $reply_length)) {
+        echo $level, " rt: ", $reply_type, " rv: '", $reply_value, "'", PHP_EOL;    
+    }
+    
+}
+
 //test_ketama();
 //test_simple();
 //test_leak();
@@ -271,7 +298,8 @@ function test_timeout()
 //test_connections();
 //test_convenience();
 //test_error();
-test_timeout();
+//test_timeout();
+test_order();
 echo "done...!", PHP_EOL;
 
 ?>

@@ -22,7 +22,9 @@ format of the results does not change.
 
 As a convenience, The PHP extension does at least support formatting the get and set commands.
 
-Examples (in increasing order of complexity)
+The C API is documented in include/redis.h and an example is given in test.c (make c_test)
+
+Examples in PHP (in increasing order of complexity)
 
 -- Hello world (in PHP, using the included php extension) --
 

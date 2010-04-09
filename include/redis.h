@@ -20,7 +20,7 @@
  * In order to communicate with a Redis server you will need at least to create an instance of Batch, Connection and Executor. e.g.:
  *
  * Batch *batch = Batch_new();
- * Connection *connection = Connection_new('127.0.0.1:6379');
+ * Connection *connection = Connection_new("127.0.0.1:6379");
  * Executor *executor = Executor_new();
  *
  * One or more Redis commands can be written into the batch using the Batch_write_XXX functions:
@@ -46,8 +46,9 @@
  * ReplyType reply_type;
  * char *reply_data;
  * size_t reply_len;
- * while(int level = Batch_next_reply(batch, &reply_type, &reply_data, &reply_len)) {
- * 		printf("reply type: %d, data: '%s', len: %d\n", (int)reply_type, reply_data, reply_len);
+ * int level;
+ * while(level = Batch_next_reply(batch, &reply_type, &reply_data, &reply_len)) {
+ * 		printf("level: %d, reply type: %d, data: '%.*s'\n", level, (int)reply_type, reply_len, reply_data);
  * }
  *
  * If a function returns an error code (e.g. -1). You can call Module_last_error to get a textual description of the error.
@@ -70,26 +71,31 @@ typedef struct _Executor Executor;
  * Create a new instance of the library. (Currently this just returns the same global instance. This might change in the future)
  */
 Module *Module_new();
+
 /**
- * Overrid various memory-management functons to be used by libredis. You don't have to set these,
+ * Override various memory-management functons to be used by libredis. You don't have to set these,
  * libredis will use normal alloc/realloc/free in that case.
  */
 void Module_set_alloc_alloc(Module *module, void * (*alloc_malloc)());
 void Module_set_alloc_realloc(Module *module, void * (*alloc_realloc)(void *, size_t));
 void Module_set_alloc_free(Module *module, void (*alloc_free)(void *));
+
 /**
  * Initialise the libredis module once all properties have been set. The library is now ready to be used.
  * Returns -1 if there is an error, 0 if all is ok.
  */
 int Module_init(Module *module);
+
 /**
  * Gets the amount of heap memory currently allocated by the libredis module. This should return 0 after the module has been freed.
  */
 size_t Module_get_allocated(Module *module);
+
 /**
  * Gets a textual description of the last error that occurred.
  */
 char *Module_last_error(Module *module);
+
 /**
  * Release all resources still held by libredis. The library cannot be used anymore after this call.
  */
@@ -102,6 +108,7 @@ void Module_free(Module *module);
  * will be written to Redis.
  */
 Connection *Connection_new(const char *addr);
+
 /**
  * Release all resources held by the connection.
  */
@@ -126,10 +133,12 @@ typedef enum _ReplyType
  * Create a new Batch of redis commands
  */
 Batch *Batch_new();
+
 /**
  * Release all resources of the given batch
  */
 void Batch_free(Batch *batch);
+
 /**
  * Writes a command or part of a command into the batch. The batch will keep an internal pointer to the last written
  * position, so that the next write will be appended from there. The batch will automatically grow in size.
@@ -138,19 +147,59 @@ void Batch_free(Batch *batch);
  * In that case pass NULL for str and 0 for str_len.
  */
 void Batch_write(Batch *batch, const char *str, size_t str_len, int num_commands);
+
 /**
  * Write a decimal into the batch (as a string, like using %d in a printf call).
  */
 void Batch_write_decimal(Batch *batch, long decimal);
 
-//reading out replies
-int (Batch *batch, ReplyType *reply_type, char **data, size_t *len);
+/**
+ * Reads the next reply from the batch. This will return the replies in the order the commands were given.
+ * Call repeatedly until all replies have been read (it will return 0 when there are no more replies left).
+ * For some reply types, data will point to the content of the reply (RT_BULK, RT_OK, RT_ERROR). In that
+ * case the len argument will contain the length of this data (e.g. the data is NOT null terminated).
+ * In the case of a multibulk reply RT_MULTIBULK, the len argument will contain the number of bulk replies that follow.
+ * Note that any data pointed to by the data argument is only valid as long as the batch is not freed.
+ * If you want to do something with it later on, you need to copy it yourself.
+ */
+int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *len);
+
+/**
+ * If a batch was aborted (maybe because a connection went down or timed-out), there will be an error message
+ * associated with the batch. Use this function to retrieve it.
+ * Returns NULL if there was no error in the batch.
+ */
 char *Batch_error(Batch *batch);
 
+
+/**
+ * Creates a new empty Executor
+ */
 Executor *Executor_new();
+
+/**
+ * Frees any resources held by the Executor
+ */
 void Executor_free(Executor *executor);
+
+/**
+ * Associate a batch with a connection. When execute is called the commands from the batch
+ * will be executed on the given connection.
+ * Returns 0 if all ok, -1 if there was an error making the association.
+ */
 int Executor_add(Executor *executor, Connection *connection, Batch *batch);
+
+/**
+ * Execute all associated (connection, batch) pairs within the given timeout. The commands
+ * contained by the batches will be send to their respective connections, and the replies to these commands
+ * will be gathered in their respective batches.
+ * When all batches complete within the timeout, the result of this function is 1.
+ * If a timeout occurs before completion. the result of this function is 0, and all commands in all batches that
+ * were not completed at the time of timeout will get an error reply.
+ * If there is an error with this method itself, it will return -1.
+ */
 int Executor_execute(Executor *executor, int timeout_ms);
+
 
 //ketama hashing
 Ketama *Ketama_new();

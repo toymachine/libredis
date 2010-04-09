@@ -217,7 +217,7 @@ void Batch_add_reply(Batch *batch, Reply *reply)
 	DEBUG(("pop cmd from command queue\n"));
 	DEBUG(("add reply/cmd back to reply queue\n"));
 	batch->num_commands -= 1;
-	list_add(&reply->list, &batch->reply_queue);
+	list_add_tail(&reply->list, &batch->reply_queue);
 }
 
 char *Batch_error(Batch *batch)
@@ -247,22 +247,38 @@ void Batch_abort(Batch *batch, const char *error)
 
 int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *len)
 {
+	DEBUG(("Batch_next_reply\n"));
+
+	if(reply_type == NULL || data == NULL || len == NULL) {
+		Module_set_error(GET_MODULE(), "Invalid argument");
+		return -1;
+	}
+
+	*reply_type = RT_NONE;
+	*data = NULL;
+	*len = 0;
+
 	struct list_head *current = batch->current_reply[batch->current_reply_sp];
 	struct list_head *last = batch->current_reply[batch->current_reply_sp + 1];
+
 	current = current->next;
+
 	batch->current_reply[batch->current_reply_sp] = current;
 
 	if(current == last) {
 		if(batch->current_reply_sp > 0) {
+			DEBUG(("Batch_next_reply, current == last, pop\n"));
 			batch->current_reply_sp -= 2;
 			assert(batch->current_reply_sp >= 0);
 			current = batch->current_reply[batch->current_reply_sp];
 			last = batch->current_reply[batch->current_reply_sp + 1];
+			if(current == last) {
+				//ok were also at the end at this level
+				return 0;
+			}
 		}
 		else {
-			*reply_type = RT_NONE;
-			*data = NULL;
-			*len = 0;
+			DEBUG(("Batch_next_reply, current == last, end\n"));
 			return 0;
 		}
 	}
@@ -292,8 +308,13 @@ int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *l
 		batch->current_reply[batch->current_reply_sp] = &current_reply->children;
 		batch->current_reply[batch->current_reply_sp + 1] = &current_reply->children;
 	}
-	else {
+	else if(current_reply->type == RT_NONE ||
+			 current_reply->type == RT_BULK_NIL ||
+			 current_reply->type == RT_MULTIBULK_NIL) {
 		*data = NULL;
+	}
+	else {
+		assert(0);
 	}
 	*len = current_reply->len;
 	return level;

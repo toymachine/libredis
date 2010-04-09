@@ -16,6 +16,11 @@ php_ext:
 	cd $(PHP_EXT_BUILD); ./configure --with-libredis=$(REDIS_HOME)
 	cd $(PHP_EXT_BUILD); sudo make install
 
+c_test: libredis test.o
+	gcc -o test test.o -Llib -lredis
+	@echo "!! executing test, make sure you have redis running locally at 127.0.0.1:6379 !!"
+	LD_LIBRARY_PATH=lib ./test
+	
 clean:
 	cd src; rm -rf *.o
 	rm -rf lib
