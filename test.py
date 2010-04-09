@@ -41,7 +41,7 @@ def test_ketama():
     ketama.create_continuum()
     #ketama.print_continuum()
     def check(key, addr):
-        assert addr == ketama.get_server_addr(ketama.get_server(key))
+        assert addr == ketama.get_server_address(ketama.get_server_ordinal(key))
         
     check('12936', '10.0.1.7:11211')
     check('27804', '10.0.1.5:11211')
@@ -94,7 +94,7 @@ def profile(f = None):
 
 if __name__ == '__main__':
     #test_ketama()
-    test_simple()
+    #test_simple()
     #profile(test_mget)
-    #test_mget()
+    test_mget()
     

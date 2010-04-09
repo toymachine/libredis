@@ -27,9 +27,9 @@ function test_ketama() {
     $ketama->add_server("10.0.1.8", 11211, 100);
     
     $ketama->create_continuum();
-    $ordinal = $ketama->get_server("piet5234");
+    $ordinal = $ketama->get_server_ordinal("piet5234");
 	echo "ord: ", $ordinal, PHP_EOL;
-	echo "addr: ", $ketama->get_server_addr($ordinal), PHP_EOL;
+	echo "addr: ", $ketama->get_server_address($ordinal), PHP_EOL;
 	
 	//test speed of creating continuum:
     $start = microtime(true);
@@ -54,7 +54,7 @@ function mget($keys, $ketama) {
 	$batch_keys = array();
     //add all keys to batches
     foreach($keys as $key) {
-        $server_ordinal = $ketama->get_server($key);
+        $server_ordinal = $ketama->get_server_ordinal($key);
         if(!isset($batches[$server_ordinal])) {
             $batch = $libredis->create_batch("MGET");
             $batches[$server_ordinal] = $batch;
@@ -69,7 +69,7 @@ function mget($keys, $ketama) {
     $executor = $libredis->create_executor();
     foreach($batches as $server_ordinal=>$batch) {
         $batch->write("\r\n", 1);
-        $server_addr = $ketama->get_server_addr($server_ordinal);
+        $server_addr = $ketama->get_server_address($server_ordinal);
 		$connection = $libredis->get_connection($server_addr);	
         $executor->add($connection, $batch);
     }
@@ -289,17 +289,17 @@ function test_order()
     
 }
 
-//test_ketama();
+test_ketama();
 //test_simple();
 //test_leak();
-//test_mget();
+test_mget();
 //test_destroy();
 //test_integer_reply();
 //test_connections();
 //test_convenience();
 //test_error();
 //test_timeout();
-test_order();
+//test_order();
 echo "done...!", PHP_EOL;
 
 ?>

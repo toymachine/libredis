@@ -145,7 +145,7 @@ unsigned int Ketama_hashi( char* inString, size_t inLen )
                         |   digest[0] );
 }
 
-char *Ketama_get_server_addr(Ketama *ketama, int ordinal)
+char *Ketama_get_server_address(Ketama *ketama, int ordinal)
 {
 	assert(ordinal >= 0);
 	assert(ordinal < ketama->numservers);
@@ -155,7 +155,7 @@ char *Ketama_get_server_addr(Ketama *ketama, int ordinal)
 }
 
 
-int Ketama_get_server(Ketama *ketama, char* key, size_t key_len)
+int Ketama_get_server_ordinal(Ketama *ketama, char* key, size_t key_len)
 {
     unsigned int h = Ketama_hashi( key, key_len );
     int highp = ketama->numpoints;

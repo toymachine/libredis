@@ -146,7 +146,7 @@ class Batch(object):
             self.free()
 
 class Ketama(object):
-    libredis.Ketama_get_server_addr.restype = c_char_p
+    libredis.Ketama_get_server_address.restype = c_char_p
     
     def __init__(self):
         self._ketama = libredis.Ketama_new()
@@ -160,11 +160,11 @@ class Ketama(object):
     def print_continuum(self):
         libredis.Ketama_print_continuum(self._ketama)
 
-    def get_server(self, key):
-        return libredis.Ketama_get_server(self._ketama, key, len(key))
+    def get_server_ordinal(self, key):
+        return libredis.Ketama_get_server_ordinal(self._ketama, key, len(key))
 
-    def get_server_addr(self, ordinal):
-        return libredis.Ketama_get_server_addr(self._ketama, ordinal)
+    def get_server_address(self, ordinal):
+        return libredis.Ketama_get_server_address(self._ketama, ordinal)
 
     def free(self):
         libredis.Ketama_free(self._ketama)
@@ -180,7 +180,7 @@ class Redis(object):
         self.connection_manager = connection_manager
 
     def _execute_simple(self, batch, server_key, timeout_ms = DEFAULT_TIMEOUT_MS):
-        server_addr = self.server_hash.get_server_addr(self.server_hash.get_server(server_key))
+        server_addr = self.server_hash.get_server_address(self.server_hash.get_server_ordinal(server_key))
         connection = self.connection_manager.get_connection(server_addr)
         return connection._execute_simple(batch, timeout_ms)
         
@@ -199,7 +199,7 @@ class Redis(object):
         batches = {}
         #add all keys to batches
         for key in keys:
-            server_ip = self.server_hash.get_server_addr(self.server_hash.get_server(key))
+            server_ip = self.server_hash.get_server_address(self.server_hash.get_server_ordinal(key))
             batch = batches.get(server_ip, None)
             if batch is None: #new batch
                 batch = Batch("MGET")

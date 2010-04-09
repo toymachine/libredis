@@ -201,12 +201,59 @@ int Executor_add(Executor *executor, Connection *connection, Batch *batch);
 int Executor_execute(Executor *executor, int timeout_ms);
 
 
-//ketama hashing
+/**
+* Create a new ketama consistent hashing object.
+* The implementation was taken more or less straight from the original libketama,
+* for info on this see: http://www.audioscrobbler.net/development/ketama/
+* The API was changed a bit to fit the coding style of libredis. plus all
+* the shared memory stuff was removed as I thought that to be too specific for a general library.
+* A good explanation of consistent hashing can be found here:
+* http://www.tomkleinpeter.com/2008/03/17/programmers-toolbox-part-3-consistent-hashing/
+* The ketama algorithm is widely used in many clients (for instance memcached clients).
+*
+* Basic usage:
+*
+* Ketama *ketama = Ketama_new(); //create a new ketama object
+* //add your server list:
+* Ketama_add_server(ketama, '127.0.0.1', 6379, 100);
+* Ketama_add_server(ketama, '127.0.0.1', 6390, 125);
+* Ketama_add_server(ketama, '10.0.0.18', 6379, 90);
+* // ... etc etc
+* // Then create the hash-ring by calling
+* Ketama_create_continuum(ketama);
+* // Now your ketama object is ready for use.
+* // You can map a key to some server like this
+* char *my_key = "foobar42";
+* int ordinal = Ketama_get_server_ordinal(ketama, my_key, strlen(my_key));
+* char *server_address = Ketama_get_server_address(ketama, ordinal);
+*/
 Ketama *Ketama_new();
+
+/**
+ * Frees any resources held by the ketama object.
+ */
 void Ketama_free(Ketama *ketama);
+
+/**
+ * Add a server to the hash-ring. This must be called (repeatedly) BEFORE calling Ketama_create_continuum.
+ * Address must be an IP-address of a server as a dotted string e.g. 127.0.0.1, 192.168.1.10 etc etc. port is the servers port number
+ * The weight is the relative weight of this server in the ring.
+ */
 void Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long weight);
+
+/**
+ * After all servers have been added call this method to finalize the hash-ring before use.
+ */
 void Ketama_create_continuum(Ketama *ketama);
-int Ketama_get_server(Ketama *ketama, char* key, size_t key_len);
-char *Ketama_get_server_addr(Ketama *ketama, int ordinal);
+
+/**
+ * Hash the given key to some server (denoted by ordinal). key_len is the length of the key in bytes.
+ */
+int Ketama_get_server_ordinal(Ketama *ketama, char* key, size_t key_len);
+
+/**
+ * Return the ip address of the server as a string "ip.ip.ip.ip:port"
+ */
+char *Ketama_get_server_address(Ketama *ketama, int ordinal);
 
 #endif

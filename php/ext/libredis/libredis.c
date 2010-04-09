@@ -82,7 +82,7 @@ PHP_METHOD(Ketama, add_server)
 	Ketama_add_server(Ketama_getThis(), ip, port, weight);
 }
 
-PHP_METHOD(Ketama, get_server)
+PHP_METHOD(Ketama, get_server_ordinal)
 {
 	char *key;
 	int key_len;
@@ -91,10 +91,10 @@ PHP_METHOD(Ketama, get_server)
 		RETURN_NULL();
 	}
 
-	RETURN_LONG(Ketama_get_server(Ketama_getThis(), key, key_len));
+	RETURN_LONG(Ketama_get_server_ordinal(Ketama_getThis(), key, key_len));
 }
 
-PHP_METHOD(Ketama, get_server_addr)
+PHP_METHOD(Ketama, get_server_address)
 {
 	long ordinal;
 
@@ -102,7 +102,7 @@ PHP_METHOD(Ketama, get_server_addr)
 		RETURN_NULL();
 	}
 
-	RETURN_STRING(Ketama_get_server_addr(Ketama_getThis(), ordinal), 1);
+	RETURN_STRING(Ketama_get_server_address(Ketama_getThis(), ordinal), 1);
 }
 
 PHP_METHOD(Ketama, create_continuum)
@@ -113,8 +113,8 @@ PHP_METHOD(Ketama, create_continuum)
 function_entry ketama_methods[] = {
     PHP_ME(Ketama,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
     PHP_ME(Ketama,  add_server,           NULL, ZEND_ACC_PUBLIC)
-    PHP_ME(Ketama,  get_server,           NULL, ZEND_ACC_PUBLIC)
-    PHP_ME(Ketama,  get_server_addr,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Ketama,  get_server_ordinal,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Ketama,  get_server_address,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Ketama,  create_continuum,  NULL, ZEND_ACC_PUBLIC)
     {NULL, NULL, NULL}
 };
