@@ -501,7 +501,6 @@ int Executor_execute(Executor *executor, int timeout_ms)
 		//do the select
 		DEBUG(("Executor start select max_fd %d, num_events: %d\n", executor->max_fd, executor->numevents));
 		select_result = select(executor->max_fd + 1, &readfds, &writefds, NULL, &tv);
-		//TODO set global error msg to errno
 
 		DEBUG(("Executor select res %d\n", select_result));
 
