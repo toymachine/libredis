@@ -31,6 +31,32 @@
 #include "batch.h"
 
 
+#ifndef CLOCK_MONOTONIC
+#ifdef __APPLE__
+
+#define CLOCK_MONOTONIC 1
+#include <mach/mach_time.h>
+typedef int clockid_t;
+
+int clock_gettime(clockid_t clk_id, struct timespec *tp) {
+    if(clk_id != CLOCK_MONOTONIC)
+        return -1;
+
+    uint64_t t = mach_absolute_time();
+    static mach_timebase_info_data_t info = {0,0};
+    mach_timebase_info(&info);
+    uint64_t t_nano = t * (info.numer / info.denom);
+
+    tp->tv_sec = t_nano * 1e-9;
+    tp->tv_nsec = t_nano - (tp->tv_sec * 1e9);
+
+    return 0;
+}
+
+#endif
+#endif
+
+
 #define ADDR_SIZE 22 //max size of ip:port addr string
 
 typedef enum _ConnectionState
