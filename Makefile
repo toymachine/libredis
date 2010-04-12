@@ -3,9 +3,18 @@ CFLAGS=-DNDEBUG -I"./include" -O3 -pedantic -Wall -c -fmessage-length=0 -std=gnu
 REDIS_HOME=$(CURDIR)
 PHP_EXT_BUILD=$(REDIS_HOME)/php/build
 
+UNAME := $(shell uname)
+
+ifeq ($(UNAME), Linux)
+ LIBS=-lm -lrt
+endif
+ifeq ($(UNAME), Darwin)
+ LIBS=-lm
+endif
+
 libredis: src/batch.o src/connection.o src/ketama.o src/md5.o src/module.o src/parser.o src/buffer.o
 	mkdir -p lib
-	gcc -shared -o"lib/libredis.so" ./src/batch.o ./src/buffer.o ./src/connection.o ./src/ketama.o ./src/md5.o ./src/module.o ./src/parser.o -lm -lrt
+	gcc -shared -o"lib/libredis.so" ./src/batch.o ./src/buffer.o ./src/connection.o ./src/ketama.o ./src/md5.o ./src/module.o ./src/parser.o $(LIBS)
 
 php_ext:
 	rm -rf $(PHP_EXT_BUILD)
