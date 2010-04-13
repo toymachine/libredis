@@ -14,7 +14,7 @@ endif
 
 libredis: src/batch.o src/connection.o src/ketama.o src/md5.o src/module.o src/parser.o src/buffer.o
 	mkdir -p lib
-	gcc -shared -o"lib/libredis.so" ./src/batch.o ./src/buffer.o ./src/connection.o ./src/ketama.o ./src/md5.o ./src/module.o ./src/parser.o $(LIBS)
+	gcc -shared -o "lib/libredis.so" ./src/batch.o ./src/buffer.o ./src/connection.o ./src/ketama.o ./src/md5.o ./src/module.o ./src/parser.o $(LIBS)
 
 php_ext:
 	rm -rf $(PHP_EXT_BUILD)
@@ -34,6 +34,8 @@ clean:
 	cd src; rm -rf *.o
 	rm -rf lib
 	rm -rf php/build
+	rm test
+	rm test.o
 	-find . -name *.pyc -exec rm -rf {} \;
 	-find . -name *.so -exec rm -rf {} \;
 	-find . -name '*~' -exec rm -rf {} \;

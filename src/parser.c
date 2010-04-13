@@ -80,7 +80,7 @@ void ReplyParser_free(ReplyParser *rp)
  * 		   0->5->9->10->11->12 => bulk reply ($5\r\nblaat\r\n)
  * 		   0->13->14->15->16 => nil multibulk reply (*-1\r\n)
  * 		   0->13->17->18 => multibulk reply (*3\r\n (... bulk replies ...)
- * 		   0->?/  => integer reply (:42\r\n)
+ * 		   0->19->20 => integer reply (:42\r\n)
  * Note that it is not a 'pure' state machine (from a language theory perspective), e.g. some additional state is kept to
  * keep track of the number of chars to still read in a bulk reply, and some state to keep track of bulk replies that
  * belong to a multibulk reply.

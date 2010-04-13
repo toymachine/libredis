@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
 		char *reply_data;
 		size_t reply_len;
 		int level;
-		while(level = Batch_next_reply(batch, &reply_type, &reply_data, &reply_len)) {
+		while((level = Batch_next_reply(batch, &reply_type, &reply_data, &reply_len))) {
 			printf("level: %d, reply type: %d, data: '%.*s'\n", level, (int)reply_type, reply_len, reply_data);
 		}
 	}
