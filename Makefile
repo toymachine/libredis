@@ -34,8 +34,8 @@ clean:
 	cd src; rm -rf *.o
 	rm -rf lib
 	rm -rf php/build
-	rm test
-	rm test.o
+	rm -rf test
+	rm -rf test.o
 	-find . -name *.pyc -exec rm -rf {} \;
 	-find . -name *.so -exec rm -rf {} \;
 	-find . -name '*~' -exec rm -rf {} \;
