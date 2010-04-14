@@ -12,6 +12,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -57,8 +58,6 @@ int clock_gettime(clockid_t clk_id, struct timespec *tp) {
 #endif
 
 
-#define ADDR_SIZE 22 //max size of ip:port addr string
-
 typedef enum _ConnectionState
 {
     CS_CLOSED = 0,
@@ -77,8 +76,9 @@ typedef enum _EventType
 
 struct _Connection
 {
-	char addr[ADDR_SIZE];
-	struct sockaddr_in sa; //parsed addres
+	char addr[ADDR_SIZE]; //host name/ip address
+	char serv[SERV_SIZE]; //port number
+	struct addrinfo *addrinfo;
 	int sockfd;
 	ConnectionState state;
 	Batch *current_batch;
@@ -111,35 +111,31 @@ Connection *Connection_new(const char *in_addr)
 		return NULL;
 	}
 
-	//copy socket addr
-	if(ADDR_SIZE < snprintf(connection->addr, ADDR_SIZE, "%s", in_addr)) {
+	//copy address
+	int invalid_address = 0;
+	char *service;
+	if (NULL == (service = strchr(in_addr, ':'))) {
+		invalid_address = ADDR_SIZE < snprintf(connection->addr, ADDR_SIZE, "%s", in_addr)
+				|| SERV_SIZE < snprintf(connection->serv, SERV_SIZE, "%s", XSTR(DEFAULT_IP_PORT));
+	}
+	else {
+		int addr_length = service - in_addr + 1;
+		if (ADDR_SIZE < addr_length) {
+			invalid_address = 1;
+		}
+		else {
+			snprintf(connection->addr, addr_length, "%s", in_addr);
+			invalid_address = SERV_SIZE < snprintf(connection->serv, SERV_SIZE, "%s", service + 1);
+		}
+	}
+	if (invalid_address) {
 		Module_set_error(GET_MODULE(), "Invalid address for Connection");
 		Connection_free(connection);
 		return NULL;
 	}
+	DEBUG(("Connection address: '%s', service: '%s'\n", connection->addr, connection->serv));
 
-	//parse addr
-	int port = DEFAULT_IP_PORT;
-	char *pport;
-	char addr[ADDR_SIZE];
-	DEBUG(("parsing connection addr: %s\n", connection->addr));
-	if(NULL == (pport = strchr(connection->addr, ':'))) {
-		port = DEFAULT_IP_PORT;
-		snprintf(addr, ADDR_SIZE, "%s", connection->addr);
-	}
-	else {
-		port = atoi(pport + 1);
-		snprintf(addr, (pport - connection->addr + 1), "%s", connection->addr);
-	}
-	connection->sa.sin_family = AF_INET;
-	connection->sa.sin_port = htons(port);
-	if(!inet_pton(AF_INET, addr, &connection->sa.sin_addr)) {
-		Module_set_error(GET_MODULE(), "Could not parse ip address");
-		Connection_free(connection);
-		return NULL;
-	}
-	DEBUG(("Connection ip: '%s', port: %d\n", addr, port));
-
+	connection->addrinfo = NULL;
 	connection->sockfd = 0;
 
 	return connection;
@@ -153,6 +149,9 @@ void Connection_free(Connection *connection)
 	if(connection->parser != NULL) {
 		ReplyParser_free(connection->parser);
 	}
+	if (connection->addrinfo != NULL) {
+		freeaddrinfo(connection->addrinfo);
+	}
 	DEBUG(("dealloc Connection\n"));
 	Alloc_free_T(connection, Connection);
 }
@@ -162,8 +161,19 @@ int Connection_create_socket(Connection *connection)
 	assert(connection != NULL);
 	assert(CS_CLOSED == connection->state);
 
+	//resolve address
+	struct addrinfo hints;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_ADDRCONFIG;
+	if (getaddrinfo(connection->addr, connection->serv, &hints, &connection->addrinfo)) {
+		Connection_abort(connection, "could not resolve address");
+		return -1;
+	}
+
 	//create socket
-	connection->sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	struct addrinfo *addrinfo = connection->addrinfo;
+	connection->sockfd = socket(addrinfo->ai_family, addrinfo->ai_socktype, addrinfo->ai_protocol);
 	if(connection->sockfd == -1) {
 		Connection_abort(connection, "could not create socket");
 		return -1;
@@ -197,7 +207,7 @@ void Connection_abort(Connection *connection, const char *format,  ...)
 	va_start(args, format);
 	vsnprintf(error1, MAX_ERROR_SIZE, format, args);
 	va_end(args);
-	snprintf(error2, MAX_ERROR_SIZE, "Connection error %s [addr: %s]", error1, connection->addr);
+	snprintf(error2, MAX_ERROR_SIZE, "Connection error %s [addr: %s:%s]", error1, connection->addr, connection->serv);
 
 	DEBUG(("Connection aborting: %s\n", error2));
 
@@ -211,6 +221,10 @@ void Connection_abort(Connection *connection, const char *format,  ...)
 
 		//close the socket
 		close(connection->sockfd);
+	}
+	if (connection->addrinfo != NULL) {
+		freeaddrinfo(connection->addrinfo);
+		connection->addrinfo = NULL;
 	}
 
 	connection->sockfd = 0;
@@ -262,7 +276,8 @@ void Connection_write_data(Connection *connection)
 			return;
 		}
 		//connect the socket
-		if(-1 == connect(connection->sockfd, (struct sockaddr *) &connection->sa, sizeof(struct sockaddr))) {
+		struct addrinfo *addrinfo = connection->addrinfo;
+		if(-1 == connect(connection->sockfd, addrinfo->ai_addr, addrinfo->ai_addrlen)) {
 			//open the connection
 			if(EINPROGRESS == errno) {
 				//normal async connect

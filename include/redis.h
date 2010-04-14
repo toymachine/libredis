@@ -102,8 +102,8 @@ char *Module_last_error(Module *module);
 void Module_free(Module *module);
 
 /**
- * Create a new connection to a Redis instance. addr should be of form 'xxx.xxx.xxx.xxx:y' where xxx is an ip-address and y is the port
- * to connect to. if the port is not given the default Redis port of 6379 will be used.
+ * Create a new connection to a Redis instance. addr should be a string <hostname:port> or <ip-address:port>.
+ * If the port (and colon) part is omitted the default Redis port of 6379 will be used.
  * Note that the actual connection will not be made at this point. It will open the connection as soon as the first command
  * will be written to Redis.
  */
@@ -236,10 +236,10 @@ void Ketama_free(Ketama *ketama);
 
 /**
  * Add a server to the hash-ring. This must be called (repeatedly) BEFORE calling Ketama_create_continuum.
- * Address must be an IP-address of a server as a dotted string e.g. 127.0.0.1, 192.168.1.10 etc etc. port is the servers port number
+ * Address must be an ip-address or hostname of a server. port is the servers port number.
  * The weight is the relative weight of this server in the ring.
  */
-void Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long weight);
+int Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long weight);
 
 /**
  * After all servers have been added call this method to finalize the hash-ring before use.
@@ -252,7 +252,7 @@ void Ketama_create_continuum(Ketama *ketama);
 int Ketama_get_server_ordinal(Ketama *ketama, char* key, size_t key_len);
 
 /**
- * Return the ip address of the server as a string "ip.ip.ip.ip:port"
+ * Return the address of the server as a string "address:port" as passed to the original call to Ketama_add_server
  */
 char *Ketama_get_server_address(Ketama *ketama, int ordinal);
 

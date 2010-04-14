@@ -50,7 +50,7 @@ typedef struct
 
 typedef struct
 {
-    char addr[22];
+    char addr[ADDR_SIZE];
     unsigned long memory;
 } serverinfo;
 
@@ -93,7 +93,7 @@ void Ketama_free(Ketama *ketama)
 	Alloc_free_T(ketama, Ketama);
 }
 
-void Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long weight)
+int Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long weight)
 {
 	assert(ketama->numservers <= ketama->maxservers);
 	if(ketama->servers == NULL) {
@@ -108,10 +108,12 @@ void Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long
 		ketama->servers = Alloc_realloc(ketama->servers, sizeof(serverinfo) * ketama->maxservers, sizeof(serverinfo) * oldmaxservers);
 	}
 	serverinfo *info = &(ketama->servers[ketama->numservers]);
-	sprintf(info->addr, "%s:%d", addr, port);
+	snprintf(info->addr, sizeof(info->addr), "%s:%d", addr, port); //TODO check error (e.g. address too long)
 	info->memory = weight;
 	ketama->numservers += 1;
 	ketama->memory += weight;
+
+	return 0;
 }
 
 /** \brief Hashing function, converting a string to an unsigned int by using MD5.

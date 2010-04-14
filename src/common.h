@@ -15,9 +15,15 @@
 #define MAX_BUFF_SIZE (1024 * 1024 * 4)
 #define MAX_CONNECTIONS 1024
 
+#define ADDR_SIZE 255
+#define SERV_SIZE 20
+
 #ifndef MIN
 #define MIN(a,b) ((a)>(b)?(b):(a))
 #endif
+
+#define XSTR(s) STR(s)
+#define STR(s) #s
 
 #define DEFAULT_IP_PORT 6379
 
