@@ -91,6 +91,7 @@ void Connection_abort(Connection *connection, const char *format,  ...);
 void Connection_execute_start(Connection *connection, Executor *executor, Batch *batch);
 void Connection_write_data(Connection *connection);
 void Connection_read_data(Connection *connection);
+void Connection_close(Connection *connection);
 
 void Executor_notify_event(Executor *executor, Connection *connection, EventType event);
 
@@ -149,11 +150,28 @@ void Connection_free(Connection *connection)
 	if(connection->parser != NULL) {
 		ReplyParser_free(connection->parser);
 	}
-	if (connection->addrinfo != NULL) {
-		freeaddrinfo(connection->addrinfo);
-	}
+	Connection_close(connection);
+
 	DEBUG(("dealloc Connection\n"));
 	Alloc_free_T(connection, Connection);
+}
+
+//TODO make connection close public?, in that case make sure
+//state is CS_CLOSE after the method is finished
+void Connection_close(Connection *connection)
+{
+	assert(connection != NULL);
+
+	if(connection->sockfd > 0) {
+		//close the socket
+		close(connection->sockfd);
+		connection->sockfd = 0;
+	}
+
+	if (connection->addrinfo != NULL) {
+		freeaddrinfo(connection->addrinfo);
+		connection->addrinfo = NULL;
+	}
 }
 
 int Connection_create_socket(Connection *connection)
@@ -215,19 +233,8 @@ void Connection_abort(Connection *connection, const char *format,  ...)
 	connection->current_batch = NULL;
 	connection->current_executor = NULL;
 
-	if(CS_CONNECTED == connection->state ||
-	   CS_CONNECTING == connection->state) {
-		assert(connection->sockfd > 0);
+	Connection_close(connection);
 
-		//close the socket
-		close(connection->sockfd);
-	}
-	if (connection->addrinfo != NULL) {
-		freeaddrinfo(connection->addrinfo);
-		connection->addrinfo = NULL;
-	}
-
-	connection->sockfd = 0;
 	connection->state = CS_ABORTED;
 
 	DEBUG(("Connection aborted\n"));
