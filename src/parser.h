@@ -24,6 +24,6 @@ ReplyParser *ReplyParser_new();
 void ReplyParser_reset(ReplyParser *rp);
 void ReplyParser_free(ReplyParser *rp);
 
-ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len, Reply **reply);
+ReplyParserResult ReplyParser_execute(ReplyParser *rp, Buffer *buffer, size_t len, Reply **reply);
 
 #endif

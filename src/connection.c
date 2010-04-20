@@ -363,7 +363,7 @@ void Connection_read_data(Connection *connection)
 	while(Batch_has_command(connection->current_batch)) {
 		DEBUG(("exec rp\n"));
 		Reply *reply = NULL;
-		ReplyParserResult rp_res = ReplyParser_execute(connection->parser, Buffer_data(buffer), Buffer_position(buffer), &reply);
+		ReplyParserResult rp_res = ReplyParser_execute(connection->parser, buffer, Buffer_position(buffer), &reply);
 		switch(rp_res) {
 		case RPR_ERROR: {
 			Connection_abort(connection, "result parse error");

@@ -33,8 +33,7 @@ struct _Batch
 	struct list_head *current_reply[BATCH_REPLY_ITERATOR_STACK_SIZE * 2];
 
 	//error for aborted batch
-	char error[MAX_ERROR_SIZE];
-	int has_error;
+	Buffer *error;
 };
 
 struct _Reply
@@ -43,7 +42,7 @@ struct _Reply
 
 	ReplyType type;
 
-	Byte *data;
+	Buffer *buffer;
 	size_t offset;
 	size_t len;
 
@@ -52,13 +51,13 @@ struct _Reply
 
 ALLOC_LIST_T(Reply, list)
 
-Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len)
+Reply *Reply_new(ReplyType type, Buffer *buffer, size_t offset, size_t len)
 {
 	Reply *reply;
 	Reply_list_alloc(&reply);
 	DEBUG(("Reply_new, type: %d\n", type));
 	reply->type = type;
-	reply->data = data;
+	reply->buffer = buffer;
 	reply->offset = offset;
 	reply->len = len;
 	INIT_LIST_HEAD(&reply->children);
@@ -98,8 +97,8 @@ size_t Reply_length(Reply *reply)
 
 Byte *Reply_data(Reply *reply)
 {
-	assert(reply->data != NULL);
-	return reply->data + reply->offset;
+	assert(reply->buffer != NULL);
+	return Buffer_data(reply->buffer) + reply->offset;
 }
 
 ReplyType Reply_type(Reply *reply)
@@ -161,7 +160,7 @@ Batch *Batch_new()
 	batch->current_reply[0] = &batch->reply_queue;
 	batch->current_reply[1] = &batch->reply_queue;
 
-	batch->has_error = 0;
+	batch->error = NULL;
 
 	return batch;
 }
@@ -187,7 +186,10 @@ void _Batch_free(Batch *batch, int final)
 		Buffer_fill(batch->write_buffer, 0);
 #endif
 	}
-	batch->has_error = 0;
+	if (batch->error) {
+		Buffer_free(batch->error);
+		batch->error = NULL;
+	}
 	Batch_list_free(batch, final);
 }
 
@@ -222,8 +224,8 @@ void Batch_add_reply(Batch *batch, Reply *reply)
 
 char *Batch_error(Batch *batch)
 {
-	if(batch->has_error) {
-		return batch->error;
+	if(batch->error) {
+		return Buffer_data(batch->error);
 	}
 	else {
 		return NULL;
@@ -233,15 +235,14 @@ char *Batch_error(Batch *batch)
 void Batch_abort(Batch *batch, const char *error)
 {
 	DEBUG(("Batch abort\n"));
-	int written = snprintf(batch->error, MAX_ERROR_SIZE, "%s", error);
-	if(written > MAX_ERROR_SIZE) {
-		written = MAX_ERROR_SIZE;
-	}
+	assert(batch->error == NULL);
+	int length = strlen(error) + 1; //include terminating null character
+	batch->error = Buffer_new(length);
+	Buffer_write(batch->error, error, length);
 	while(Batch_has_command(batch)) {
 		DEBUG(("Batch abort, adding error reply\n"));
-		Batch_add_reply(batch, Reply_new(RT_ERROR, batch->error, 0, written));
+		Batch_add_reply(batch, Reply_new(RT_ERROR, batch->error, 0, length));
 	}
-	batch->has_error = 1;
 }
 
 

@@ -11,8 +11,9 @@
 
 #include "redis.h"
 #include "common.h"
+#include "buffer.h"
 
-Reply *Reply_new(ReplyType type, Byte *data, size_t offset, size_t len);
+Reply *Reply_new(ReplyType type, Buffer *buffer, size_t offset, size_t len);
 void Reply_free(Reply *reply);
 void Reply_free_final();
 

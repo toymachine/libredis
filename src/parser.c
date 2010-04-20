@@ -85,13 +85,13 @@ void ReplyParser_free(ReplyParser *rp)
  * keep track of the number of chars to still read in a bulk reply, and some state to keep track of bulk replies that
  * belong to a multibulk reply.
  */
-ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len, Reply **reply)
+ReplyParserResult ReplyParser_execute(ReplyParser *rp, Buffer *buffer, size_t len, Reply **reply)
 {    
 	DEBUG(("enter rp exec, rp->p: %d, len: %d, cs: %d\n", rp->p, len, rp->cs));
 	assert(rp->p <= len);
     while((rp->p) < len) {
     	*reply = NULL;
-    	Byte c = buffer[rp->p];
+    	Byte c = Buffer_data(buffer)[rp->p];
         //printf("cs: %d, char: %d\n", rp->cs, c);
         switch(rp->cs) {
             case 0: { //initial state
@@ -242,7 +242,7 @@ ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len,
             //start normal bulk reply
             case 9: {
                 if(c == CR) { //end of digits
-                    rp->bulk_count = atoi(buffer + rp->mark);
+                    rp->bulk_count = atoi(Buffer_data(buffer) + rp->mark);
                     rp->p++;
                     rp->cs = 10;
                     continue;
@@ -346,7 +346,7 @@ ReplyParserResult ReplyParser_execute(ReplyParser *rp, Byte *buffer, size_t len,
             //start normal multibulk reply
             case 17: {
                 if(c == CR) { //end of digits
-                    rp->multibulk_count = atoi(buffer + rp->mark);
+                    rp->multibulk_count = atoi(Buffer_data(buffer) + rp->mark);
                     rp->multibulk_reply = Reply_new(RT_MULTIBULK, NULL, 0, rp->multibulk_count);
                     rp->p++;
                     rp->cs = 18;
