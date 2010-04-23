@@ -394,8 +394,6 @@ ReplyParserResult ReplyParser_execute(ReplyParser *rp, Buffer *buffer, size_t le
     }
     DEBUG(("exit rp pos: %d len: %d cs: %d\n", rp->p, len, rp->cs));
     assert(rp->p == len);
-    assert(len > 0 ? (rp->cs != 0) : 1);
-    assert(rp->cs == 0 ? len == 0 : 1);
     return RPR_MORE;
 }
 

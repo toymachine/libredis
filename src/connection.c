@@ -509,6 +509,9 @@ int Executor_current_timeout(Executor *executor, struct timeval *tv)
 	DEBUG(("Executor cur_tm: %3.2f\n", cur_tm_ms));
 	double left_ms = executor->end_tm_ms - cur_tm_ms;
 	DEBUG(("Time left: %3.2f\n", left_ms));
+	if (left_ms < 0.0) {
+		return -1;
+	}
 	tv->tv_sec = (time_t)left_ms / 1000.0;
 	tv->tv_usec = (left_ms - (tv->tv_sec * 1000.0)) * 1000.0;
 	DEBUG(("Timeout: %d sec, %d usec\n", (int)tv->tv_sec, (int)tv->tv_usec));
@@ -535,22 +538,27 @@ int Executor_execute(Executor *executor, int timeout_ms)
 	int select_result = 1;
 	//for as long there are outstanding events and no error or timeout occurred:
 	while(executor->numevents > 0 && select_result > 0) {
+		fd_set readfds;
+		fd_set writefds;
 
 		//figure out how many ms left for this execution
 		struct timeval tv;
-		Executor_current_timeout(executor, &tv);
+		if (Executor_current_timeout(executor, &tv) == -1) {
+			//if no time is left, force a timeout
+			select_result = 0;
+			FD_ZERO(&readfds);
+			FD_ZERO(&writefds);
+		} else {
+			//copy filedes. sets, because select is going to modify them
+			readfds = executor->readfds;
+			writefds = executor->writefds;
 
-		//copy filedes. sets, because select is going to modify them
-		fd_set readfds;
-		fd_set writefds;
-		readfds = executor->readfds;
-		writefds = executor->writefds;
+			//do the select
+			DEBUG(("Executor start select max_fd %d, num_events: %d\n", executor->max_fd, executor->numevents));
+			select_result = select(executor->max_fd + 1, &readfds, &writefds, NULL, &tv);
 
-		//do the select
-		DEBUG(("Executor start select max_fd %d, num_events: %d\n", executor->max_fd, executor->numevents));
-		select_result = select(executor->max_fd + 1, &readfds, &writefds, NULL, &tv);
-
-		DEBUG(("Executor select res %d\n", select_result));
+			DEBUG(("Executor select res %d\n", select_result));
+		}
 
 		for(int i = 0; i < executor->numpairs; i++) {
 
