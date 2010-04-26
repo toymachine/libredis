@@ -12,15 +12,15 @@ ifeq ($(UNAME), Darwin)
  LIBS=-lm
 endif
 
-libredis: src/batch.o src/connection.o src/ketama.o src/md5.o src/module.o src/parser.o src/buffer.o
+libredis: libredis/batch.o libredis/connection.o libredis/ketama.o libredis/md5.o libredis/module.o libredis/parser.o libredis/buffer.o
 	mkdir -p lib
-	gcc -shared -o "lib/libredis.so" ./src/batch.o ./src/buffer.o ./src/connection.o ./src/ketama.o ./src/md5.o ./src/module.o ./src/parser.o $(LIBS)
+	gcc -shared -o "lib/libredis.so" ./libredis/batch.o ./libredis/buffer.o ./libredis/connection.o ./libredis/ketama.o ./libredis/md5.o ./libredis/module.o ./libredis/parser.o $(LIBS)
 
 php_ext:
 	rm -rf $(PHP_EXT_BUILD)
 	cp -a php/ext/libredis $(PHP_EXT_BUILD)
-	cp src/*.c $(PHP_EXT_BUILD)
-	cp src/*.h $(PHP_EXT_BUILD)
+	cp libredis/*.c $(PHP_EXT_BUILD)
+	cp libredis/*.h $(PHP_EXT_BUILD)
 	cd $(PHP_EXT_BUILD); phpize
 	cd $(PHP_EXT_BUILD); ./configure --with-libredis=$(REDIS_HOME)
 	cd $(PHP_EXT_BUILD); sudo make install
@@ -31,7 +31,7 @@ c_test: libredis test.o
 	LD_LIBRARY_PATH=lib ./test
 	
 clean:
-	cd src; rm -rf *.o
+	cd libredis; rm -rf *.o
 	rm -rf lib
 	rm -rf php/build
 	rm -rf test

@@ -21,7 +21,7 @@ if test "$PHP_LIBREDIS" != "no"; then
 
   dnl # --with-libredis -> check with-path
   SEARCH_PATH="/usr/local /usr"     # you might want to change this
-  SEARCH_FOR="/include/redis.h"  # you most likely want to change this
+  SEARCH_FOR="/libredis/redis.h"  # you most likely want to change this
   if test -r $PHP_LIBREDIS/$SEARCH_FOR; then # path given as parameter
      LIBREDIS_DIR=$PHP_LIBREDIS
   else # search default path list
@@ -40,7 +40,7 @@ if test "$PHP_LIBREDIS" != "no"; then
   fi
 
   dnl # --with-libredis -> add include path
-  PHP_ADD_INCLUDE($LIBREDIS_DIR/include)
+  PHP_ADD_INCLUDE($LIBREDIS_DIR/libredis)
 
   dnl # --with-libredis -> check for lib and symbol presence
   dnl LIBNAME=libredis # you may want to change this

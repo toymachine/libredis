@@ -8,7 +8,7 @@
 
 #include <stdio.h>
 
-#include "redis.h"
+#include "libredis/redis.h"
 
 int main(int argc, char *argv[])
 {
