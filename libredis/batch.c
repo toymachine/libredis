@@ -167,15 +167,18 @@ Batch *Batch_new()
 
 void _Batch_free(Batch *batch, int final)
 {
+	DEBUG(("_Batch_free\n"));
 	while(!list_empty(&batch->reply_queue)) {
 		Reply *reply = list_pop_T(Reply, list, &batch->reply_queue);
 		Reply_free(reply);
 	}
 	if(final) {
+		DEBUG(("_Batch_free final\n"));
 		Buffer_free(batch->read_buffer);
 		Buffer_free(batch->write_buffer);
 	}
 	else {
+		DEBUG(("_Batch_free re-use\n"));
 		Buffer_clear(batch->read_buffer);
 		Buffer_clear(batch->write_buffer);
 #ifndef NDEBUG

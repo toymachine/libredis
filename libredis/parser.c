@@ -362,6 +362,12 @@ ReplyParserResult ReplyParser_execute(ReplyParser *rp, Buffer *buffer, size_t le
                 if(c == LF) {
                     rp->p++;
                     rp->cs = 0;
+	            if(rp->multibulk_count == 0) {
+			//multi bulk reply with 0 entries
+                	*reply = rp->multibulk_reply;
+                	rp->multibulk_reply = NULL;
+                	return RPR_REPLY;
+                    }
                     continue;
                 }
                 break;

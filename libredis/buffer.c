@@ -61,7 +61,10 @@ void Buffer_clear(Buffer *buffer)
 	buffer->position = 0;
 	buffer->limit = buffer->buff_size;
 	buffer->capacity = buffer->buff_size;
+
+	DEBUG(("Buffer_clear %p done position: %d, limit: %d, cap: %d\n", buffer, buffer->position, buffer->limit, buffer->capacity));
 }
+
 
 void Buffer_free(Buffer *buffer)
 {
@@ -122,6 +125,7 @@ void Buffer_set_limit(Buffer *buffer, size_t limit)
 
 void Buffer_ensure_remaining(Buffer *buffer, int min_remaining)
 {
+	DEBUG(("Buffer %p ensure remaining: position: %d, limit: %d, cap: %d\n", buffer, buffer->position, buffer->limit, buffer->capacity));
 	assert(buffer->limit == buffer->capacity);
 	while(Buffer_remaining(buffer) < min_remaining) {
 		buffer->limit *= 2;
@@ -169,10 +173,12 @@ void Buffer_flip(Buffer *buffer)
 {
 	buffer->limit = buffer->position;
 	buffer->position = 0;
+	DEBUG(("Buffer_flip done %p, position: %d, limit: %d, cap: %d\n", buffer, buffer->position, buffer->limit, buffer->capacity));
 }
 
 void Buffer_write(Buffer *buffer, const char *data, size_t len)
 {
+	DEBUG(("Buffer_write %d bytes\n", len));
 	Buffer_ensure_remaining(buffer, len);
 	memcpy(buffer->data + buffer->position, data, len);
 	buffer->position += len;

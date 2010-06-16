@@ -370,12 +370,14 @@ void Connection_read_data(Connection *connection)
 			return;
 		}
 		case RPR_MORE: {
+			DEBUG(("read data RPR_MORE buf recv\n"));
 			size_t res = Buffer_recv(buffer, connection->sockfd);
 #ifndef NDEBUG
 		Buffer_dump(buffer, 128);
 #endif
 			if(res == -1) {
 				if(errno == EAGAIN) {
+ 					DEBUG(("read data expecting more data in future, adding event\n"));
 					Executor_notify_event(connection->current_executor, connection, EVENT_READ);
 					return;
 				}
@@ -391,6 +393,7 @@ void Connection_read_data(Connection *connection)
 			break;
 		}
 		case RPR_REPLY: {
+			DEBUG(("read data RPR_REPLY batch add reply\n"));
 			Batch_add_reply(connection->current_batch, reply);
 			break;
 		}

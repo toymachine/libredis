@@ -148,6 +148,36 @@ function test_simple() {
     }
 }
 
+function test_multibulk_reply() {
+
+    global $libredis;
+    global $ip;
+
+    $connection = $libredis->get_connection("$ip:6379");
+    
+    
+    $batch = $libredis->create_batch("HGETALL test\r\n", 1);
+    $executor = $libredis->create_executor();
+    $executor->add($connection, $batch);
+    $executor->execute(400);
+    $batch->next_reply($reply_type, $reply_value, $reply_length);
+    print_r($reply_type);
+    print_r($reply_value);
+    
+    $batch = $libredis->create_batch("HSET test2 piet 3\r\nbar\r\n", 1);
+    $executor = $libredis->create_executor();
+    $executor->add($connection, $batch);
+    $executor->execute(400);
+    echo "HSET DONE", PHP_EOL;
+    $batch = $libredis->create_batch("HGETALL test2\r\n", 1);
+    $executor = $libredis->create_executor();
+    $executor->add($connection, $batch);
+    $executor->execute(400);
+    $batch->next_reply($reply_type, $reply_value, $reply_length);
+    print_r($reply_type);
+    print_r($reply_value);
+}
+
 function test_leak() {
     global $libredis;
     $batches = array();
@@ -289,10 +319,11 @@ function test_order()
 
 }
 
-test_ketama();
+test_multibulk_reply();
+//test_ketama();
 //test_simple();
 //test_leak();
-test_mget();
+//test_mget();
 //test_destroy();
 //test_integer_reply();
 //test_connections();
