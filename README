@@ -93,7 +93,7 @@ $executor->execute(500);
 
 So basically,
 
-1. Commands are written into Batches; Batch::write(...), Batch::set(key, value), Batch::get(key)
+1. Commands are written into Batches; Batch::cmd(...), Batch::set(key, value), Batch::get(key), Batch::write(...)
 2. Batches are associated with Connections trough an Executor; Executor::add(connection, batch)
 3. The total operation is performed within a configurable timeout by calling Executor::execute(timeout)
 4. When execution returns, batches will contain replies that can be read out; Batch::next_reply(...)
