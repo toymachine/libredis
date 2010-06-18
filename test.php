@@ -9,6 +9,8 @@ define("RT_MULTIBULK_NIL", 4);
 define("RT_MULTIBULK", 5);
 define("RT_INTEGER", 6);
 
+define("EOL", "\r\n");
+
 $ip = "127.0.0.1";
 //$ip = "192.168.13.92";
 
@@ -154,8 +156,8 @@ function test_multibulk_reply() {
     global $ip;
 
     $connection = $libredis->get_connection("$ip:6379");
-    
-    
+
+
     $batch = $libredis->create_batch("HGETALL test\r\n", 1);
     $executor = $libredis->create_executor();
     $executor->add($connection, $batch);
@@ -163,7 +165,7 @@ function test_multibulk_reply() {
     $batch->next_reply($reply_type, $reply_value, $reply_length);
     print_r($reply_type);
     print_r($reply_value);
-    
+
     $batch = $libredis->create_batch("HSET test2 piet 3\r\nbar\r\n", 1);
     $executor = $libredis->create_executor();
     $executor->add($connection, $batch);
@@ -232,7 +234,17 @@ function test_convenience()
 
     $connection = $libredis->get_connection("$ip:6379");
     $connection->set("piet", "test12345");
-    $connection->get("piet");
+    $connection->set("klaas", "test67890");
+    echo $connection->get("piet");
+    echo $connection->get("klaas");
+
+    $batch = $libredis->create_batch();
+    $batch->cmd("MGET", "piet", "klaas", "aap");
+    $connection = $libredis->get_connection("$ip:6379");
+    $connection->execute($batch);
+    while($batch->next_reply($reply_type, $reply_value, $reply_length)) {
+        echo 'repl', ' ', $reply_type, ' ', $reply_value, PHP_EOL;
+    }
 
     $batch = $libredis->create_batch();
     $batch->set("blaat", "aap");
@@ -241,7 +253,7 @@ function test_convenience()
     $connection->execute($batch);
     while($batch->next_reply($reply_type, $reply_value, $reply_length)) {
         echo $reply_value, PHP_EOL;
-    }//
+    }
     $batch = $libredis->create_batch();
     $batch->get("blaat");
     $batch->get("joop");
@@ -249,7 +261,6 @@ function test_convenience()
     while($batch->next_reply($reply_type, $reply_value, $reply_length)) {
         echo $reply_value, PHP_EOL;
     }
-
 }
 
 function test_error()
@@ -319,7 +330,25 @@ function test_order()
 
 }
 
-test_multibulk_reply();
+function test_bla()
+{
+    global $libredis;
+    global $ip;
+
+    $connection = $libredis->get_connection("$ip:6379");
+    //$batch = $libredis->create_batch("GET blaat\r\n", 1);
+    $key = 'blaat';
+    $batch = $libredis->create_batch('*2'.EOL.'$3'.EOL.'GET'.EOL.'$'.strlen($key).EOL.$key.EOL,1);
+    $connection->execute($batch, 400);
+    while($batch->next_reply($reply_type, $reply_value, $reply_length)) {
+        echo 'type ', $reply_type, PHP_EOL;
+        echo 'val ', $reply_value, PHP_EOL;
+    }
+}
+
+
+//test_multibulk_reply();
+//test_bla();
 //test_ketama();
 //test_simple();
 //test_leak();
@@ -327,7 +356,7 @@ test_multibulk_reply();
 //test_destroy();
 //test_integer_reply();
 //test_connections();
-//test_convenience();
+test_convenience();
 //test_error();
 //test_timeout();
 //test_order();

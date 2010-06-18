@@ -119,8 +119,8 @@ void Connection_free(Connection *connection);
  */
 typedef enum _ReplyType
 {
-	RT_ERROR = -1,
-	RT_NONE = 0,
+    RT_ERROR = -1,
+    RT_NONE = 0,
     RT_OK = 1,
     RT_BULK_NIL = 2,
     RT_BULK = 3,
@@ -152,6 +152,16 @@ void Batch_write(Batch *batch, const char *str, size_t str_len, int num_commands
  * Write a decimal into the batch (as a string, like using %d in a printf call).
  */
 void Batch_write_decimal(Batch *batch, long decimal);
+
+/**
+ * Writes a redis set command into the batch
+ */
+void Batch_write_set(Batch *batch, char *key, int key_len, char *value, int value_len);
+
+/**
+ * Writes a redis get command into the batch
+ */
+void Batch_write_get(Batch *batch, char *key, int key_len);
 
 /**
  * Reads the next reply from the batch. This will return the replies in the order the commands were given.
