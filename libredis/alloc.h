@@ -44,6 +44,7 @@ static inline void *_Alloc_realloc(void *obj, size_t new_size, size_t old_size)
 #define Alloc_free(PT, SZ) _Alloc_free(PT, SZ)
 #define Alloc_realloc(PT, SZ, OSZ) _Alloc_realloc(PT, SZ, OSZ)
 
+#ifdef SINGLETHREADED
 #define ALLOC_LIST_T(T, member) \
 	static struct list_head T ## _free_list = LIST_HEAD_INIT(T ## _free_list); \
 	\
@@ -86,7 +87,28 @@ static inline void *_Alloc_realloc(void *obj, size_t new_size, size_t old_size)
 			T *obj = list_pop_T(T, member, &T ## _free_list); \
 			_ ## T ## _free(obj, 1); \
 		} \
+	}
+#else
+#define ALLOC_LIST_T(T, member) \
+	static inline int T ## _list_alloc(T **obj) \
+	{ \
+		*obj = Alloc_alloc_T(T); \
+		return 1; \
 	} \
+	\
+	static inline void T ## _list_free(T *obj, int final) \
+	{ \
+		Alloc_free_T(obj, T); \
+	} \
+	\
+	void _ ## T ## _free(T *obj, int final); \
+	\
+	void T ## _free(T *obj) \
+	{ \
+		_ ## T ## _free(obj, 1); \
+	} \
+	void T ## _free_final() { }
+#endif
 
 #endif
 

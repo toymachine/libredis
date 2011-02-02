@@ -19,7 +19,6 @@ struct _Module
     void * (*alloc_realloc)(void *ptr, size_t size);
     void (*alloc_free)(void *ptr);
     size_t allocated;
-    char error[MAX_ERROR_SIZE];
 };
 
 extern Module g_module;

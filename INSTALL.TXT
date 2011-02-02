@@ -10,5 +10,12 @@ make libredis
 
 (which will leave 'libredis.so' in the lib dir)
 
+== Multithreading support ==
+
+Multithreading support is enabled by default. In case libredis is never used
+concurrently by multiple threads, it is possible to disable it by setting the
+environmental variable SINGLETHREADED=1 when running make. This can result in
+better performance by making the library not thread-safe.
+
 enjoy.
 

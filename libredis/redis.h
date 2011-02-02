@@ -58,7 +58,9 @@
 #ifndef REDIS_H
 #define REDIS_H
 
-#include <string.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct _Module Module;
 typedef struct _Batch Batch;
@@ -66,40 +68,42 @@ typedef struct _Connection Connection;
 typedef struct _Ketama Ketama;
 typedef struct _Executor Executor;
 
+#define LIBREDISAPI __attribute__((visibility("default")))
+
 
 /*
  * Create a new instance of the library. (Currently this just returns the same global instance. This might change in the future)
  */
-Module *Module_new();
+LIBREDISAPI Module *Module_new();
 
 /**
  * Override various memory-management functons to be used by libredis. You don't have to set these,
  * libredis will use normal alloc/realloc/free in that case.
  */
-void Module_set_alloc_alloc(Module *module, void * (*alloc_malloc)());
-void Module_set_alloc_realloc(Module *module, void * (*alloc_realloc)(void *, size_t));
-void Module_set_alloc_free(Module *module, void (*alloc_free)(void *));
+LIBREDISAPI void Module_set_alloc_alloc(Module *module, void * (*alloc_malloc)());
+LIBREDISAPI void Module_set_alloc_realloc(Module *module, void * (*alloc_realloc)(void *, size_t));
+LIBREDISAPI void Module_set_alloc_free(Module *module, void (*alloc_free)(void *));
 
 /**
  * Initialise the libredis module once all properties have been set. The library is now ready to be used.
  * Returns -1 if there is an error, 0 if all is ok.
  */
-int Module_init(Module *module);
+LIBREDISAPI int Module_init(Module *module);
 
 /**
  * Gets the amount of heap memory currently allocated by the libredis module. This should return 0 after the module has been freed.
  */
-size_t Module_get_allocated(Module *module);
+LIBREDISAPI size_t Module_get_allocated(Module *module);
 
 /**
  * Gets a textual description of the last error that occurred.
  */
-char *Module_last_error(Module *module);
+LIBREDISAPI char *Module_last_error(Module *module);
 
 /**
  * Release all resources still held by libredis. The library cannot be used anymore after this call.
  */
-void Module_free(Module *module);
+LIBREDISAPI void Module_free(Module *module);
 
 /**
  * Create a new connection to a Redis instance. addr should be a string <hostname:port> or <ip-address:port>.
@@ -107,12 +111,12 @@ void Module_free(Module *module);
  * Note that the actual connection will not be made at this point. It will open the connection as soon as the first command
  * will be written to Redis.
  */
-Connection *Connection_new(const char *addr);
+LIBREDISAPI Connection *Connection_new(const char *addr);
 
 /**
  * Release all resources held by the connection.
  */
-void Connection_free(Connection *connection);
+LIBREDISAPI void Connection_free(Connection *connection);
 
 /**
  * Enumerates the type of replies that can be read from a Batch.
@@ -132,12 +136,12 @@ typedef enum _ReplyType
 /**
  * Create a new Batch of redis commands
  */
-Batch *Batch_new();
+LIBREDISAPI Batch *Batch_new();
 
 /**
  * Release all resources of the given batch
  */
-void Batch_free(Batch *batch);
+LIBREDISAPI void Batch_free(Batch *batch);
 
 /**
  * Writes a command or part of a command into the batch. The batch will keep an internal pointer to the last written
@@ -146,22 +150,22 @@ void Batch_free(Batch *batch);
  * It is possible to call the write method without a string, just to set the number of commands in the batch.
  * In that case pass NULL for str and 0 for str_len.
  */
-void Batch_write(Batch *batch, const char *str, size_t str_len, int num_commands);
+LIBREDISAPI void Batch_write(Batch *batch, const char *str, size_t str_len, int num_commands);
 
 /**
  * Write a decimal into the batch (as a string, like using %d in a printf call).
  */
-void Batch_write_decimal(Batch *batch, long decimal);
+LIBREDISAPI void Batch_write_decimal(Batch *batch, long decimal);
 
 /**
  * Writes a redis set command into the batch
  */
-void Batch_write_set(Batch *batch, char *key, int key_len, char *value, int value_len);
+LIBREDISAPI void Batch_write_set(Batch *batch, const char *key, int key_len, const char *value, int value_len);
 
 /**
  * Writes a redis get command into the batch
  */
-void Batch_write_get(Batch *batch, char *key, int key_len);
+LIBREDISAPI void Batch_write_get(Batch *batch, const char *key, int key_len);
 
 /**
  * Reads the next reply from the batch. This will return the replies in the order the commands were given.
@@ -172,32 +176,32 @@ void Batch_write_get(Batch *batch, char *key, int key_len);
  * Note that any data pointed to by the data argument is only valid as long as the batch is not freed.
  * If you want to do something with it later on, you need to copy it yourself.
  */
-int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *len);
+LIBREDISAPI int Batch_next_reply(Batch *batch, ReplyType *reply_type, char **data, size_t *len);
 
 /**
  * If a batch was aborted (maybe because a connection went down or timed-out), there will be an error message
  * associated with the batch. Use this function to retrieve it.
  * Returns NULL if there was no error in the batch.
  */
-char *Batch_error(Batch *batch);
+LIBREDISAPI char *Batch_error(Batch *batch);
 
 
 /**
  * Creates a new empty Executor
  */
-Executor *Executor_new();
+LIBREDISAPI Executor *Executor_new();
 
 /**
  * Frees any resources held by the Executor
  */
-void Executor_free(Executor *executor);
+LIBREDISAPI void Executor_free(Executor *executor);
 
 /**
  * Associate a batch with a connection. When execute is called the commands from the batch
  * will be executed on the given connection.
  * Returns 0 if all ok, -1 if there was an error making the association.
  */
-int Executor_add(Executor *executor, Connection *connection, Batch *batch);
+LIBREDISAPI int Executor_add(Executor *executor, Connection *connection, Batch *batch);
 
 /**
  * Execute all associated (connection, batch) pairs within the given timeout. The commands
@@ -208,7 +212,7 @@ int Executor_add(Executor *executor, Connection *connection, Batch *batch);
  * were not completed at the time of timeout will get an error reply.
  * If there is an error with this method itself, it will return -1.
  */
-int Executor_execute(Executor *executor, int timeout_ms);
+LIBREDISAPI int Executor_execute(Executor *executor, int timeout_ms);
 
 
 /**
@@ -237,33 +241,37 @@ int Executor_execute(Executor *executor, int timeout_ms);
 * int ordinal = Ketama_get_server_ordinal(ketama, my_key, strlen(my_key));
 * char *server_address = Ketama_get_server_address(ketama, ordinal);
 */
-Ketama *Ketama_new();
+LIBREDISAPI Ketama *Ketama_new();
 
 /**
  * Frees any resources held by the ketama object.
  */
-void Ketama_free(Ketama *ketama);
+LIBREDISAPI void Ketama_free(Ketama *ketama);
 
 /**
  * Add a server to the hash-ring. This must be called (repeatedly) BEFORE calling Ketama_create_continuum.
  * Address must be an ip-address or hostname of a server. port is the servers port number.
  * The weight is the relative weight of this server in the ring.
  */
-int Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long weight);
+LIBREDISAPI int Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long weight);
 
 /**
  * After all servers have been added call this method to finalize the hash-ring before use.
  */
-void Ketama_create_continuum(Ketama *ketama);
+LIBREDISAPI void Ketama_create_continuum(Ketama *ketama);
 
 /**
  * Hash the given key to some server (denoted by ordinal). key_len is the length of the key in bytes.
  */
-int Ketama_get_server_ordinal(Ketama *ketama, char* key, size_t key_len);
+LIBREDISAPI int Ketama_get_server_ordinal(Ketama *ketama, const char* key, size_t key_len);
 
 /**
  * Return the address of the server as a string "address:port" as passed to the original call to Ketama_add_server
  */
-char *Ketama_get_server_address(Ketama *ketama, int ordinal);
+LIBREDISAPI char *Ketama_get_server_address(Ketama *ketama, int ordinal);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

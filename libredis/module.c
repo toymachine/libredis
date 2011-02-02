@@ -16,6 +16,7 @@
 #include "batch.h"
 
 Module g_module;
+static THREADLOCAL char error[MAX_ERROR_SIZE];
 
 Module *Module_new()
 {
@@ -62,14 +63,14 @@ size_t Module_get_allocated(Module *module)
 
 char *Module_last_error(Module *module)
 {
-	return module->error;
+	return error;
 }
 
 void Module_set_error(Module *module, char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
-	vsnprintf(module->error, MAX_ERROR_SIZE, format, args);
+	vsnprintf(error, MAX_ERROR_SIZE, format, args);
 	va_end(args);
 }
 

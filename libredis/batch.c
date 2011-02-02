@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
 #include "common.h"
 #include "alloc.h"
@@ -20,7 +21,9 @@
 
 struct _Batch
 {
+#ifdef SINGLETHREADED
     struct list_head list; //for creating lists of batches
+#endif
 
     int num_commands;
     struct list_head reply_queue; //finished commands that have replies set
@@ -211,7 +214,7 @@ void Batch_write_decimal(Batch *batch, long decimal)
     Batch_write(batch, buff, buff_len, 0);
 }
 
-void Batch_write_set(Batch *batch, char *key, int key_len, char *value, int value_len)
+void Batch_write_set(Batch *batch, const char *key, int key_len, const char *value, int value_len)
 {
     Batch_write(batch, "SET ", 4, 0);
     Batch_write(batch, key, key_len, 0);
@@ -222,7 +225,7 @@ void Batch_write_set(Batch *batch, char *key, int key_len, char *value, int valu
     Batch_write(batch, "\r\n", 2, 1);
 }
 
-void Batch_write_get(Batch *batch, char *key, int key_len)
+void Batch_write_get(Batch *batch, const char *key, int key_len)
 {
     Batch_write(batch, "GET ", 4, 0);
     Batch_write(batch, key, key_len, 0);

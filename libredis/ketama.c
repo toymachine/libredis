@@ -127,7 +127,7 @@ int Ketama_add_server(Ketama *ketama, const char *addr, int port, unsigned long 
 //void ketama_md5_digest( char* inString, size_t inLen, unsigned char md5pword[16] );
 
 /* ketama.h does not expose this function */
-void Ketama_md5_digest( char* inString, size_t inLen, unsigned char md5pword[16] )
+void Ketama_md5_digest( const char* inString, size_t inLen, unsigned char md5pword[16] )
 {
     md5_state_t md5state;
 
@@ -136,7 +136,7 @@ void Ketama_md5_digest( char* inString, size_t inLen, unsigned char md5pword[16]
     md5_finish( &md5state, md5pword );
 }
 
-unsigned int Ketama_hashi( char* inString, size_t inLen )
+unsigned int Ketama_hashi( const char* inString, size_t inLen )
 {
     unsigned char digest[16];
 
@@ -149,16 +149,21 @@ unsigned int Ketama_hashi( char* inString, size_t inLen )
 
 char *Ketama_get_server_address(Ketama *ketama, int ordinal)
 {
-	assert(ordinal >= 0);
-	assert(ordinal < ketama->numservers);
-	assert(ketama->servers != NULL);
+	if (ordinal < 0 || ordinal >= ketama->numservers || !ketama->servers) {
+		DEBUG(("Incorrect call to Ketama_get_server_address"));
+		return "";
+	}
 
 	return ketama->servers[ordinal].addr;
 }
 
 
-int Ketama_get_server_ordinal(Ketama *ketama, char* key, size_t key_len)
+int Ketama_get_server_ordinal(Ketama *ketama, const char* key, size_t key_len)
 {
+	if (!ketama->continuum) {
+		return -1;
+	}
+
     unsigned int h = Ketama_hashi( key, key_len );
     int highp = ketama->numpoints;
     mcs *mcsarr = ketama->continuum;
@@ -202,12 +207,14 @@ int Ketama_get_server_ordinal(Ketama *ketama, char* key, size_t key_len)
   * \return 0 on failure, 1 on success. */
 void Ketama_create_continuum(Ketama *ketama)
 {
-	assert(ketama->numservers > 0);
+	if (ketama->numservers == 0 || ketama->continuum) {
+		DEBUG(("Ketama_create_continuum called in incorrect state"));
+		return;
+	}
 
 	DEBUG(("Server definitions read: %u servers, total memory: %lu.\n", ketama->numservers, ketama->memory ));
 
     /* Continuum will hold one mcs for each point on the circle: */
-    assert(ketama->continuum == NULL);
     ketama->continuum = Alloc_alloc(ketama->numservers * sizeof(mcs) * 160);
     unsigned k, cont = 0;
 
@@ -224,10 +231,12 @@ void Ketama_create_continuum(Ketama *ketama)
         for( k = 0; k < ks; k++ )
         {
             /* 40 hashes, 4 numbers per hash = 160 points per server */
-            char ss[30];
+            char ss[ADDR_SIZE + 11];
             unsigned char digest[16];
 
-            int len = sprintf( ss, "%s-%d", sinfo->addr, k );
+            int len = snprintf( ss, sizeof(ss), "%s-%d", sinfo->addr, k );
+            if (len > sizeof(ss) - 1)
+            	len = sizeof(ss) - 1;
             Ketama_md5_digest( ss, len, digest );
 
             /* Use successive 4-bytes from hash as numbers 

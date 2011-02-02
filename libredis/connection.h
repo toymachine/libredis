@@ -12,7 +12,6 @@
 #include "redis.h"
 #include "common.h"
 #include "buffer.h"
-#include "event.h"
 
 #endif
 

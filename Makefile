@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-DNDEBUG -I"./include" -O3 -pedantic -Wall -c -fmessage-length=0 -std=gnu99 -fPIC
+CFLAGS=-DNDEBUG -I"./include" -O3 -pedantic -Wall -c -fmessage-length=0 -std=gnu99 -fPIC -fvisibility=hidden
 REDIS_HOME=$(CURDIR)
 PHP_EXT_BUILD=$(REDIS_HOME)/php/build
 
@@ -10,6 +10,10 @@ ifeq ($(UNAME), Linux)
 endif
 ifeq ($(UNAME), Darwin)
  LIBS=-lm
+endif
+
+ifdef SINGLETHREADED
+ CFLAGS += -DSINGLETHREADED
 endif
 
 libredis: libredis/batch.o libredis/connection.o libredis/ketama.o libredis/md5.o libredis/module.o libredis/parser.o libredis/buffer.o

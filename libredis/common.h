@@ -37,6 +37,12 @@
 #define LF '\n'
 #define CRLF '\r\n'
 
+#ifdef SINGLETHREADED
+#define THREADLOCAL
+#else
+#define THREADLOCAL __thread
+#endif
+
 typedef char Byte;
 
 //#include "alloc.h"

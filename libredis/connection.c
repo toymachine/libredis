@@ -8,10 +8,10 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/select.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <poll.h>
 #include <netdb.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -88,12 +88,12 @@ struct _Connection
 
 //forward decls.
 void Connection_abort(Connection *connection, const char *format,  ...);
-void Connection_execute_start(Connection *connection, Executor *executor, Batch *batch);
-void Connection_write_data(Connection *connection);
-void Connection_read_data(Connection *connection);
+void Connection_execute_start(Connection *connection, Executor *executor, Batch *batch, int ordinal);
+void Connection_write_data(Connection *connection, int ordinal);
+void Connection_read_data(Connection *connection, int ordinal);
 void Connection_close(Connection *connection);
 
-void Executor_notify_event(Executor *executor, Connection *connection, EventType event);
+void Executor_notify_event(Executor *executor, Connection *connection, EventType event, int ordinal);
 
 Connection *Connection_new(const char *in_addr)
 {
@@ -240,7 +240,7 @@ void Connection_abort(Connection *connection, const char *format,  ...)
 	DEBUG(("Connection aborted\n"));
 }
 
-void Connection_execute_start(Connection *connection, Executor *executor, Batch *batch)
+void Connection_execute_start(Connection *connection, Executor *executor, Batch *batch, int ordinal)
 {
 	DEBUG(("Connection exec\n"));
 
@@ -260,15 +260,15 @@ void Connection_execute_start(Connection *connection, Executor *executor, Batch 
 #endif
 
 	//kick off writing:
-	Connection_write_data(connection);
+	Connection_write_data(connection, ordinal);
 
 	//kick off reading when socket becomes readable
 	if(CS_CONNECTED == connection->state) {
-		Executor_notify_event(connection->current_executor, connection, EVENT_READ);
+		Executor_notify_event(connection->current_executor, connection, EVENT_READ, ordinal);
 	}
 }
 
-void Connection_write_data(Connection *connection)
+void Connection_write_data(Connection *connection, int ordinal)
 {
 	DEBUG(("connection write_data fd: %d\n", connection->sockfd));
 	assert(connection->current_batch != NULL);
@@ -290,7 +290,7 @@ void Connection_write_data(Connection *connection)
 				//normal async connect
 				connection->state = CS_CONNECTING;
 				DEBUG(("async connecting, adding write event\n"));
-				Executor_notify_event(connection->current_executor, connection, EVENT_WRITE);
+				Executor_notify_event(connection->current_executor, connection, EVENT_WRITE, ordinal);
 				DEBUG(("write event added, now returning\n"));
 				return;
 			}
@@ -320,7 +320,7 @@ void Connection_write_data(Connection *connection)
 		}
 		else {
 			connection->state = CS_CONNECTED;
-			Executor_notify_event(connection->current_executor, connection, EVENT_READ);
+			Executor_notify_event(connection->current_executor, connection, EVENT_READ, ordinal);
 		}
 	}
 
@@ -334,7 +334,7 @@ void Connection_write_data(Connection *connection)
 			DEBUG(("bfr send res: %d\n", res));
 			if(res == -1) {
 				if(errno == EAGAIN) {
-					Executor_notify_event(connection->current_executor, connection, EVENT_WRITE);
+					Executor_notify_event(connection->current_executor, connection, EVENT_WRITE, ordinal);
 					return;
 				}
 				else {
@@ -346,7 +346,7 @@ void Connection_write_data(Connection *connection)
 	}
 }
 
-void Connection_read_data(Connection *connection)
+void Connection_read_data(Connection *connection, int ordinal)
 {
 	if(CS_ABORTED == connection->state) {
 		return;
@@ -378,7 +378,7 @@ void Connection_read_data(Connection *connection)
 			if(res == -1) {
 				if(errno == EAGAIN) {
  					DEBUG(("read data expecting more data in future, adding event\n"));
-					Executor_notify_event(connection->current_executor, connection, EVENT_READ);
+					Executor_notify_event(connection->current_executor, connection, EVENT_READ, ordinal);
 					return;
 				}
 				else {
@@ -404,7 +404,7 @@ void Connection_read_data(Connection *connection)
 	}
 }
 
-void Connection_handle_event(Connection *connection, EventType event)
+void Connection_handle_event(Connection *connection, EventType event, int ordinal)
 {
 	if(CS_ABORTED == connection->state) {
 		return;
@@ -429,11 +429,11 @@ void Connection_handle_event(Connection *connection, EventType event)
 	}
 
 	if(event & EVENT_WRITE) {
-		Connection_write_data(connection);
+		Connection_write_data(connection, ordinal);
 	}
 
 	if(event & EVENT_READ) {
-		Connection_read_data(connection);
+		Connection_read_data(connection, ordinal);
 	}
 
 }
@@ -451,10 +451,8 @@ struct _Pair
 struct _Executor
 {
 	int numpairs;
-	int max_fd;
 	int numevents;
-	fd_set readfds;
-	fd_set writefds;
+	struct pollfd fds[MAX_PAIRS];
 	struct _Pair pairs[MAX_PAIRS];
 	double end_tm_ms;
 };
@@ -469,9 +467,6 @@ Executor *Executor_new()
 	}
 	executor->numpairs = 0;
 	executor->numevents = 0;
-	executor->max_fd = 0;
-	FD_ZERO(&executor->readfds);
-	FD_ZERO(&executor->writefds);
 	return executor;
 }
 
@@ -497,6 +492,9 @@ int Executor_add(Executor *executor, Connection *connection, Batch *batch)
 	struct _Pair *pair = &executor->pairs[executor->numpairs];
 	pair->batch = batch;
 	pair->connection = connection;
+	struct pollfd *fd = &executor->fds[executor->numpairs];
+	fd->fd = 0;
+	fd->events = fd->revents = 0;
 	executor->numpairs += 1;
 	DEBUG(("Executor add, total: %d\n", executor->numpairs));
 	return 0;
@@ -504,7 +502,7 @@ int Executor_add(Executor *executor, Connection *connection, Batch *batch)
 
 #define TIMESPEC_TO_MS(tm) (((double)tm.tv_sec) * 1000.0) + (((double)tm.tv_nsec) / 1000000.0)
 
-int Executor_current_timeout(Executor *executor, struct timeval *tv)
+int Executor_current_timeout(Executor *executor, int *timeout)
 {
 	struct timespec tm;
 	clock_gettime(CLOCK_MONOTONIC, &tm);
@@ -515,9 +513,8 @@ int Executor_current_timeout(Executor *executor, struct timeval *tv)
 	if (left_ms < 0.0) {
 		return -1;
 	}
-	tv->tv_sec = (time_t)left_ms / 1000.0;
-	tv->tv_usec = (left_ms - (tv->tv_sec * 1000.0)) * 1000.0;
-	DEBUG(("Timeout: %d sec, %d usec\n", (int)tv->tv_sec, (int)tv->tv_usec));
+	*timeout = (int)left_ms;
+	DEBUG(("Timeout: %d msec\n", *timeout));
 	return 0;
 }
 
@@ -535,32 +532,23 @@ int Executor_execute(Executor *executor, int timeout_ms)
 	executor->numevents = 0;
 	for(int i = 0; i < executor->numpairs; i++) {
 		struct _Pair *pair = &executor->pairs[i];
-		Connection_execute_start(pair->connection, executor, pair->batch);
+		Connection_execute_start(pair->connection, executor, pair->batch, i);
 	}
 
-	int select_result = 1;
+	int poll_result = 1;
 	//for as long there are outstanding events and no error or timeout occurred:
-	while(executor->numevents > 0 && select_result > 0) {
-		fd_set readfds;
-		fd_set writefds;
-
+	while(executor->numevents > 0 && poll_result > 0) {
 		//figure out how many ms left for this execution
-		struct timeval tv;
-		if (Executor_current_timeout(executor, &tv) == -1) {
+		int timeout;
+		if (Executor_current_timeout(executor, &timeout) == -1) {
 			//if no time is left, force a timeout
-			select_result = 0;
-			FD_ZERO(&readfds);
-			FD_ZERO(&writefds);
+			poll_result = 0;
 		} else {
-			//copy filedes. sets, because select is going to modify them
-			readfds = executor->readfds;
-			writefds = executor->writefds;
+			//do the poll
+			DEBUG(("Executor start poll num_events: %d\n", executor->numevents));
+			poll_result = poll(executor->fds, executor->numpairs, timeout);
 
-			//do the select
-			DEBUG(("Executor start select max_fd %d, num_events: %d\n", executor->max_fd, executor->numevents));
-			select_result = select(executor->max_fd + 1, &readfds, &writefds, NULL, &tv);
-
-			DEBUG(("Executor select res %d\n", select_result));
+			DEBUG(("Executor select res %d\n", poll_result));
 		}
 
 		for(int i = 0; i < executor->numpairs; i++) {
@@ -568,64 +556,65 @@ int Executor_execute(Executor *executor, int timeout_ms)
 			struct _Pair *pair = &executor->pairs[i];
 			Connection *connection = pair->connection;
 			Batch *batch = pair->batch;
+			struct pollfd *fd = &executor->fds[i];
 
 			EventType event = 0;
-			if(FD_ISSET(connection->sockfd, &readfds)) {
+			if(fd->revents & POLLIN) {
 				event |= EVENT_READ;
-				FD_CLR(connection->sockfd, &executor->readfds);
+				fd->events &= ~POLLIN;
+				fd->revents &= ~POLLIN;
 				executor->numevents -= 1;
 			}
-			if(FD_ISSET(connection->sockfd, &writefds)) {
+			if(fd->revents & POLLOUT) {
 				event |= EVENT_WRITE;
-				FD_CLR(connection->sockfd, &executor->writefds);
+				fd->events &= ~POLLOUT;
+				fd->revents &= ~POLLOUT;
 				executor->numevents -= 1;
 			}
 
-			if(select_result == 0) {
+			if(poll_result == 0) {
 				event = EVENT_TIMEOUT;
 			}
-			else if(select_result < 0) {
+			else if(poll_result < 0) {
 				event = EVENT_ERROR;
 			}
 
 			if(event > 0 && Batch_has_command(batch)) {
 				//there is an event, and batch is not finished
-				Connection_handle_event(connection, event);
+				Connection_handle_event(connection, event, i);
 			}
 		}
 	}
 
-	if(select_result > 1) {
-		select_result = 1;
+	if(poll_result > 1) {
+		poll_result = 1;
 	}
-	if(select_result < 0) {
+	if(poll_result < 0) {
 		Module_set_error(GET_MODULE(), "Execute select error, errno: [%d] %s", errno, strerror(errno));
 	}
-	else if(select_result == 0) {
+	else if(poll_result == 0) {
 		Module_set_error(GET_MODULE(), "Execute timeout");
 	}
 	DEBUG(("Executor execute done\n"));
-	return select_result;
+	return poll_result;
 }
 
-void Executor_notify_event(Executor *executor, Connection *connection, EventType event)
+void Executor_notify_event(Executor *executor, Connection *connection, EventType event, int ordinal)
 {
 	assert(executor != NULL);
 	assert(connection != NULL);
 	assert(connection->sockfd != 0);
 	assert(connection->state != CS_ABORTED);
 
-	if(connection->sockfd > executor->max_fd) {
-		executor->max_fd = connection->sockfd;
-	}
+	executor->fds[ordinal].fd = connection->sockfd;
 
 	if(event & EVENT_READ) {
-		FD_SET(connection->sockfd, &executor->readfds);
+		executor->fds[ordinal].events |= POLLIN;
 		executor->numevents += 1;
 	}
 
 	if(event & EVENT_WRITE) {
-		FD_SET(connection->sockfd, &executor->writefds);
+		executor->fds[ordinal].events |= POLLOUT;
 		executor->numevents += 1;
 	}
 
