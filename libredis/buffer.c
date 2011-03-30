@@ -68,7 +68,11 @@ void Buffer_clear(Buffer *buffer)
 
 void Buffer_free(Buffer *buffer)
 {
-    Alloc_free(buffer->buff, buffer->capacity);
+    Alloc_free(buffer->buff, buffer->buff_size);
+    if(buffer->capacity > buffer->buff_size) {
+        DEBUG(("Clearing enlarged buffer\n"));
+        Alloc_free(buffer->data, buffer->capacity);
+    }
     DEBUG(("dealloc Buffer\n"));
     Alloc_free_T(buffer, Buffer);
 }
