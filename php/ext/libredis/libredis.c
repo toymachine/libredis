@@ -33,9 +33,9 @@ zend_class_entry *redis_ce;
 zend_class_entry *executor_ce;
 
 //TODO proper php module globals?:
-/* If you declare any globals in php_libredis.h uncomment this:
+/* If you declare any globals in php_libredis.h uncomment this: */
 ZEND_DECLARE_MODULE_GLOBALS(libredis)
-*/
+/* */
 
 #define MAX_ERROR_SIZE 255
 
@@ -615,17 +615,34 @@ function_entry redis_methods[] = {
     {NULL, NULL, NULL}
 };
 
+/* {{{ PHP_INI
+ */
+PHP_INI_BEGIN()
+    STD_PHP_INI_BOOLEAN("libredis.log", "0", PHP_INI_ALL, OnUpdateBool, log, zend_libredis_globals, libredis_globals)
+PHP_INI_END()
+/* }}} */
+
+/* {{{ php_libredis_init_globals
+ */
+static void php_libredis_init_globals(zend_libredis_globals *libredis_globals TSRMLS_DC) 
+{
+    libredis_globals->log = 0;
+}
+/* }}} */
 
 /* {{{ PHP_MINIT_FUNCTION
  */
 PHP_MINIT_FUNCTION(libredis)
 {
-    /* If you have INI entries, uncomment these lines
+    ZEND_INIT_MODULE_GLOBALS(libredis, php_libredis_init_globals, NULL);
+    /* If you have INI entries, uncomment these lines */
     REGISTER_INI_ENTRIES();
-    */
+    /* */
     zend_class_entry ce;
 
-    openlog("libredis", 0, LOG_LOCAL2);
+    if (LIBREDIS_G(log)) {
+       openlog("libredis", 0, LOG_LOCAL2);
+    }
 
     INIT_CLASS_ENTRY(ce, "_Libredis_Ketama", ketama_methods);
     ketama_ce = zend_register_internal_class(&ce TSRMLS_CC);
@@ -658,9 +675,10 @@ PHP_MINIT_FUNCTION(libredis)
     Module_set_alloc_free(g_module, free);
     Module_init(g_module);
 
-    syslog(LOG_DEBUG, "libredis module init");
-    closelog();
-
+    if (LIBREDIS_G(log)) {
+        syslog(LOG_DEBUG, "libredis module init");
+        closelog();
+    }
     return SUCCESS;
 }
 /* }}} */
@@ -683,9 +701,9 @@ SHUTDOWN_FREE_T(Connection)
  */
 PHP_MSHUTDOWN_FUNCTION(libredis)
 {
-    /* uncomment this line if you have INI entries
+    /* uncomment this line if you have INI entries */
     UNREGISTER_INI_ENTRIES();
-    */
+    /* */
     //free the persistent connections
     zend_hash_apply(&g_connections, shutdown_hash_free_Connection);
     zend_hash_destroy(&g_connections);
@@ -697,10 +715,11 @@ PHP_MSHUTDOWN_FUNCTION(libredis)
 
     Module_free(g_module);
 
-    openlog("libredis", 0, LOG_LOCAL2);
-    syslog(LOG_DEBUG, "libredis module shutdown complete, final alloc: %d\n", Module_get_allocated(g_module));
-    closelog();
-
+    if (LIBREDIS_G(log)) {
+        openlog("libredis", 0, LOG_LOCAL2);
+        syslog(LOG_DEBUG, "libredis module shutdown complete, final alloc: %d\n", Module_get_allocated(g_module));
+        closelog();
+    }
     return SUCCESS;
 }
 /* }}} */
@@ -710,10 +729,11 @@ PHP_MSHUTDOWN_FUNCTION(libredis)
  */
 PHP_RINIT_FUNCTION(libredis)
 {
-    openlog("libredis", 0, LOG_LOCAL2);
-    syslog(LOG_DEBUG, "libredis request init");
-    closelog();
-
+    if (LIBREDIS_G(log)) {
+        openlog("libredis", 0, LOG_LOCAL2);
+        syslog(LOG_DEBUG, "libredis request init");
+        closelog();
+    }
     return SUCCESS;
 }
 /* }}} */
@@ -727,10 +747,11 @@ PHP_RSHUTDOWN_FUNCTION(libredis)
     zend_hash_apply(&g_ketama, shutdown_hash_free_Ketama); //frees any ketama still left, e.g. not freed by normal dispose
     zend_hash_apply(&g_executor, shutdown_hash_free_Executor); //frees any executor still left, e.g. not freed by normal dispose
 
-    openlog("libredis", 0, LOG_LOCAL2);
-    syslog(LOG_DEBUG, "libredis request shutdown complete, final alloc: %d, g_batchsz: %d\n", Module_get_allocated(g_module), g_batch.nNumOfElements);
-    closelog();
-
+    if (LIBREDIS_G(log)) {
+        openlog("libredis", 0, LOG_LOCAL2);
+        syslog(LOG_DEBUG, "libredis request shutdown complete, final alloc: %d, g_batchsz: %d\n", Module_get_allocated(g_module), g_batch.nNumOfElements);
+        closelog();
+    }
     return SUCCESS;
 }
 /* }}} */
@@ -743,9 +764,9 @@ PHP_MINFO_FUNCTION(libredis)
     php_info_print_table_header(2, "libredis support", "enabled");
     php_info_print_table_end();
 
-    /* Remove comments if you have entries in php.ini
+    /* Remove comments if you have entries in php.ini */
     DISPLAY_INI_ENTRIES();
-    */
+    /* */
 }
 /* }}} */
 
@@ -782,28 +803,6 @@ zend_module_entry libredis_module_entry = {
 #ifdef COMPILE_DL_LIBREDIS
 ZEND_GET_MODULE(libredis)
 #endif
-
-/* {{{ PHP_INI
- */
-/* Remove comments and fill if you need to have entries in php.ini
-PHP_INI_BEGIN()
-    STD_PHP_INI_ENTRY("libredis.global_value",      "42", PHP_INI_ALL, OnUpdateLong, global_value, zend_libredis_globals, libredis_globals)
-    STD_PHP_INI_ENTRY("libredis.global_string", "foobar", PHP_INI_ALL, OnUpdateString, global_string, zend_libredis_globals, libredis_globals)
-PHP_INI_END()
-*/
-/* }}} */
-
-/* {{{ php_libredis_init_globals
- */
-/* Uncomment this function if you have INI entries
-static void php_libredis_init_globals(zend_libredis_globals *libredis_globals)
-{
-    libredis_globals->global_value = 0;
-    libredis_globals->global_string = NULL;
-}
-*/
-/* }}} */
-
 
 /*
  * Local variables:

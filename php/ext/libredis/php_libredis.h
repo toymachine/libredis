@@ -43,12 +43,10 @@ PHP_MINFO_FUNCTION(libredis);
 /* 
   	Declare any global variables you may need between the BEGIN
 	and END macros here:     
-
-ZEND_BEGIN_MODULE_GLOBALS(libredis)
-	long  global_value;
-	char *global_string;
-ZEND_END_MODULE_GLOBALS(libredis)
 */
+ZEND_BEGIN_MODULE_GLOBALS(libredis)
+   zend_bool  log;
+ZEND_END_MODULE_GLOBALS(libredis)
 
 /* In every utility function you add that needs to use variables 
    in php_libredis_globals, call TSRMLS_FETCH(); after declaring other 
