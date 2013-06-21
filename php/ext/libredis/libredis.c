@@ -108,7 +108,7 @@ PHP_METHOD(Ketama, create_continuum)
     Ketama_create_continuum(Ketama_getThis());
 }
 
-function_entry ketama_methods[] = {
+zend_function_entry ketama_methods[] = {
     PHP_ME(Ketama,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
     PHP_ME(Ketama,  add_server,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Ketama,  get_server_ordinal,           NULL, ZEND_ACC_PUBLIC)
@@ -173,7 +173,7 @@ PHP_METHOD(Executor, execute)
     }
 }
 
-function_entry executor_methods[] = {
+zend_function_entry executor_methods[] = {
     PHP_ME(Executor,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
     PHP_ME(Executor,  add,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Executor,  execute,           NULL, ZEND_ACC_PUBLIC)
@@ -315,7 +315,7 @@ PHP_METHOD(Connection, get)
 }
 
 
-function_entry connection_methods[] = {
+zend_function_entry connection_methods[] = {
     PHP_ME(Connection,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
     PHP_ME(Connection,  execute,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Connection,  set,           NULL, ZEND_ACC_PUBLIC)
@@ -497,7 +497,7 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_batch_next_rely, 0, 0, 3)
     ZEND_ARG_INFO(1, reply_length)
 ZEND_END_ARG_INFO()
 
-function_entry batch_methods[] = {
+zend_function_entry batch_methods[] = {
     PHP_ME(Batch,  __destruct,     NULL, ZEND_ACC_PUBLIC | ZEND_ACC_DTOR)
     PHP_ME(Batch,  write,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Batch,  set,           NULL, ZEND_ACC_PUBLIC)
@@ -606,7 +606,7 @@ PHP_METHOD(Redis, create_batch)
 
 }
 
-function_entry redis_methods[] = {
+zend_function_entry redis_methods[] = {
     PHP_ME(Redis,  create_ketama,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Redis,  create_executor,           NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Redis,  create_batch,           NULL, ZEND_ACC_PUBLIC)
