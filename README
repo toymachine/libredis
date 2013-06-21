@@ -1,4 +1,13 @@
-This is the README for Libredis (http://github.com/toymachine/libredis)
+This is the README for Libredis (https://github.com/hyves-org/libredis)
+
+please not that the main repository this is now at:
+
+https://github.com/hyves-org/libredis
+
+The one at:
+
+https://github.com/toymachine/libredis is no longer maintained.
+
 
 Libredis is general client library for Redis written in C.
 
